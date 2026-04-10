@@ -282,6 +282,42 @@ router.post('/api-key', async (req, res) => {
 });
 
 /**
+ * POST /api/redmine/logout
+ * 退出登录，清除 cookie 配置
+ */
+router.post('/logout', (req, res) => {
+  try {
+    // 读取现有数据
+    let data = {};
+    if (fs.existsSync(API_KEY_FILE)) {
+      try {
+        data = JSON.parse(fs.readFileSync(API_KEY_FILE, 'utf-8'));
+      } catch (e) {
+        data = {};
+      }
+    }
+    
+    // 清除 cookie
+    delete data.cookie;
+    data.updatedAt = new Date().toISOString();
+    
+    // 保存
+    fs.writeFileSync(API_KEY_FILE, JSON.stringify(data, null, 2));
+    
+    // 清除 redmineService 中的凭据
+    redmineService.clearCredentials();
+    
+    res.json({ 
+      success: true, 
+      message: '已退出登录' 
+    });
+  } catch (error) {
+    console.error('退出登录失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * GET /api/redmine/config
  * 获取当前配置（项目 ID 等）
  */

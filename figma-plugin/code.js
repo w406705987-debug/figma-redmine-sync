@@ -1,5 +1,5 @@
 // Figma Plugin - 易协作同步工具
-figma.showUI(__html__, { width: 400, height: 620 });
+figma.showUI(__html__, { width: 400, height: 720 });
 
 // 获取文件信息
 var fileKey = null;
@@ -78,6 +78,49 @@ function setNodeHyperlink(nodeId, url) {
   }
 }
 
+// 根据 nodeId 获取节点所在的页面名称
+function getPageInfoByNodeId(nodeId) {
+  // nodeId 格式通常是 "pageId:nodeId" 或直接 "nodeId"
+  // 先尝试解析，看是否能找到对应页面
+  var pageName = figma.currentPage.name; // 默认使用当前页面名
+  var nodeName = '';
+  
+  try {
+    // 尝试直接获取节点
+    var node = figma.getNodeById(nodeId);
+    if (node) {
+      nodeName = node.name;
+      // 向上查找直到找到 PageNode
+      var current = node;
+      while (current && current.type !== 'PAGE') {
+        current = current.parent;
+      }
+      if (current && current.type === 'PAGE') {
+        pageName = current.name;
+      }
+    } else {
+      // 如果找不到节点，可能是其他页面的节点
+      // 遍历所有页面查找
+      var pages = figma.root.children;
+      for (var i = 0; i < pages.length; i++) {
+        var page = pages[i];
+        // nodeId 可能包含页面前缀
+        if (nodeId.indexOf(page.id) === 0 || nodeId.indexOf(page.id.replace(':', '-')) === 0) {
+          pageName = page.name;
+          break;
+        }
+      }
+    }
+  } catch(e) {
+    console.log('获取页面信息失败:', e);
+  }
+  
+  return {
+    pageName: pageName,
+    nodeName: nodeName
+  };
+}
+
 // 监听来自 UI 的消息
 figma.ui.onmessage = function(msg) {
   var selectionInfo, fileUrl, result, nodeName;
@@ -137,6 +180,25 @@ figma.ui.onmessage = function(msg) {
     }).catch(function(e) {
       console.log('clientStorage 加载失败:', e);
     });
+  }
+  
+  else if (msg.type === 'get-page-info') {
+    // 根据 nodeId 获取节点所在的页面名称
+    var pageInfo = getPageInfoByNodeId(msg.nodeId);
+    figma.ui.postMessage({ 
+      type: 'page-info-result', 
+      data: {
+        linkIndex: msg.linkIndex,
+        pageName: pageInfo.pageName,
+        nodeName: pageInfo.nodeName
+      }
+    });
+  }
+  
+  else if (msg.type === 'resize') {
+    // 动态调整插件窗口大小
+    var newHeight = Math.min(Math.max(msg.height, 430), 900); // 限制在 430-900 之间
+    figma.ui.resize(400, newHeight);
   }
   
   else if (msg.type === 'notify') {

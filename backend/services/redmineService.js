@@ -103,6 +103,24 @@ class RedmineService {
   }
 
   /**
+   * 清除凭据（用于退出登录）
+   */
+  clearCredentials() {
+    try {
+      // 清除凭据文件
+      const CREDENTIALS_FILE = path.join(__dirname, '../data/credentials.json');
+      if (fs.existsSync(CREDENTIALS_FILE)) {
+        fs.unlinkSync(CREDENTIALS_FILE);
+      }
+      // 清除本地缓存
+      this.issueCache = [];
+      console.log('已清除凭据和缓存');
+    } catch (e) {
+      console.error('清除凭据失败:', e);
+    }
+  }
+
+  /**
    * 获取保存的 API Key（向后兼容）
    */
   getApiKey() {
