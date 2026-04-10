@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Figma-易协作同步工具 (纯离线版)</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; font-size: 12px; padding: 12px; background: #fff; }
+    
+    .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #e5e5e5; margin-bottom: 12px; }
+    .header h1 { font-size: 14px; }
+    
+    .section { background: #f7f7f7; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+    .section-title { font-size: 12px; font-weight: bold; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+    
+    .import-area { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+    .import-area h3 { font-size: 12px; color: #1d4ed8; margin-bottom: 8px; }
+    .import-area textarea { width: 100%; height: 80px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 10px; font-family: monospace; resize: none; }
+    .import-area .hint { font-size: 10px; color: #666; margin-top: 6px; }
+    
+    .btn { padding: 8px 12px; border: none; border-radius: 6px; font-size: 11px; cursor: pointer; }
+    .btn-small { padding: 6px 10px; }
+    .btn-primary { background: #0066ff; color: white; }
+    .btn-success { background: #22c55e; color: white; }
+    .btn-warning { background: #f59e0b; color: white; }
+    .btn-secondary { background: #e5e5e5; color: #333; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    .issue-status { font-size: 9px; padding: 2px 4px; border-radius: 3px; background: #e5e5e5; color: #666; margin-left: 4px; white-space: nowrap; }
+    .issue-status.status-新建 { background: #dbeafe; color: #1d4ed8; }
+    .issue-status.status-UI设计中 { background: #fef3c7; color: #d97706; }
+    .issue-status.status-策划审核中 { background: #fce7f3; color: #be185d; }
+    .issue-status.status-跟进验收联调 { background: #d1fae5; color: #059669; }
+    
+    .filter-box { margin-bottom: 8px; }
+    .filter-box select { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; background: white; }
+    
+    .issue-list { max-height: 150px; overflow-y: auto; }
+    .issue-item { display: flex; align-items: center; gap: 8px; padding: 8px; background: white; border-radius: 6px; margin-bottom: 4px; cursor: pointer; border: 2px solid transparent; }
+    .issue-item:hover { background: #f0f7ff; }
+    .issue-item.selected { border-color: #0066ff; background: #f0f7ff; }
+    .issue-id { color: #0066ff; font-weight: bold; min-width: 60px; }
+    .issue-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    
+    .selection-info { background: white; padding: 10px; border-radius: 6px; }
+    .node-name { font-weight: bold; margin-bottom: 4px; }
+    .node-type { font-size: 10px; background: #e5e5e5; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px; }
+    .node-url { font-size: 10px; color: #0066ff; word-break: break-all; }
+    
+    .actions { display: flex; gap: 8px; margin-bottom: 8px; }
+    .actions .btn { flex: 1; }
+    
+    .empty { text-align: center; color: #999; padding: 16px; }
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 8px; display: none; z-index: 1000; }
+    .toast.show { display: block; }
+    .toast.success { background: #22c55e; }
+    .toast.error { background: #ef4444; }
+    
+    .add-manual { display: flex; gap: 6px; margin-bottom: 8px; }
+    .add-manual input { flex: 1; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📋 Figma-易协作同步 (离线版)</h1>
+    <button class="btn btn-small btn-secondary" id="toggleImportBtn">📥 导入工单</button>
+  </div>
+
+  <!-- 导入区域（默认隐藏） -->
+  <div class="import-area" id="importArea" style="display: none;">
+    <h3>📥 粘贴工单数据</h3>
+    <p style="font-size: 10px; margin-bottom: 8px; color: #666;">
+      在 CodeMaker 中说"帮我获取王叶的工单"，然后复制返回的工单列表粘贴到这里
+    </p>
+    <textarea id="importInput" placeholder="粘贴工单 JSON 数据..."></textarea>
+    <div style="display: flex; gap: 8px; margin-top: 8px;">
+      <button class="btn btn-success btn-small" id="importBtn">✅ 导入</button>
+      <button class="btn btn-secondary btn-small" id="loadSampleBtn">📋 加载示例</button>
+    </div>
+    <div class="hint">支持 JSON 格式或直接粘贴文本格式的工单列表</div>
+  </div>
+
+  <!-- 手动添加 -->
+  <div class="section">
+    <div class="section-title">
+      <span>我的工单 <span id="issueCount">(0个)</span></span>
+      <button class="btn btn-small btn-secondary" id="clearBtn">🗑️ 清空</button>
+    </div>
+    
+    <div class="add-manual">
+      <input type="text" id="manualInput" placeholder="输入工单号，如 449112">
+      <button class="btn btn-small btn-primary" id="addManualBtn">➕</button>
+    </div>
+    
+    <div class="filter-box">
+      <select id="statusFilter">
+        <option value="default">🎯 默认（新建/设计中/审核中）</option>
+        <option value="all">📋 全部状态</option>
+        <option value="新建">🆕 新建</option>
+        <option value="UI设计中">🎨 UI设计中</option>
+        <option value="策划审核中">📝 策划审核中</option>
+        <option value="跟进验收联调">✅ 跟进验收联调</option>
+      </select>
+    </div>
+    
+    <div class="issue-list" id="issueList">
+      <div class="empty">点击"导入工单"添加数据</div>
+    </div>
+  </div>
+
+  <!-- 当前选择 -->
+  <div class="section">
+    <div class="section-title">当前选中节点</div>
+    <div class="selection-info" id="selectionInfo">
+      <div class="empty">请在画布中选择一个元素</div>
+    </div>
+  </div>
+
+  <!-- 操作按钮 -->
+  <div class="actions">
+    <button class="btn btn-primary" id="linkBtn" disabled>🔗 添加工单链接</button>
+    <button class="btn btn-warning" id="copyPopoBtn" disabled>📋 复制审核内容</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    var STORAGE_KEY = 'figma-redmine-offline';
+    var REDMINE_HOST = 'x20.pm.netease.com';
+    
+    var state = {
+      issues: [],
+      filteredIssues: [],
+      selectedIssue: null,
+      selection: null,
+      fileKey: '',
+      baseFileUrl: ''
+    };
+
+    // ==================== 存储 ====================
+    
+    function loadState() {
+      try {
+        var saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          var data = JSON.parse(saved);
+          state.issues = data.issues || [];
+          state.fileKey = data.fileKey || '';
+          state.baseFileUrl = data.baseFileUrl || '';
+        }
+      } catch (e) {
+        console.log('加载状态失败:', e);
+      }
+    }
+
+    function saveState() {
+      try {
+        var data = {
+          issues: state.issues,
+          fileKey: state.fileKey,
+          baseFileUrl: state.baseFileUrl
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (e) {
+        console.log('保存状态失败:', e);
+      }
+    }
+
+    // ==================== 导入解析 ====================
+    
+    function parseImportData(text) {
+      text = text.trim();
+      var issues = [];
+      
+      // 尝试解析 JSON
+      try {
+        var json = JSON.parse(text);
+        if (Array.isArray(json)) {
+          issues = json;
+        } else if (json.issues) {
+          issues = json.issues;
+        } else if (json.data && json.data.list) {
+          issues = json.data.list;
+        }
+      } catch (e) {
+        // 不是 JSON，尝试解析文本格式
+        // 格式: #123456 - 标题\n状态: xxx
+        var lines = text.split('\n');
+        var currentIssue = null;
+        
+        lines.forEach(function(line) {
+          line = line.trim();
+          
+          // 匹配 "• #123456 - 标题" 或 "#123456 - 标题"
+          var match = line.match(/[•\-\*]?\s*#?(\d+)\s*[-–—]\s*(.+)/);
+          if (match) {
+            if (currentIssue) {
+              issues.push(currentIssue);
+            }
+            currentIssue = {
+              id: parseInt(match[1]),
+              subject: match[2].trim(),
+              status: '未知'
+            };
+          }
+          
+          // 匹配状态行
+          if (currentIssue && line.includes('状态:')) {
+            var statusMatch = line.match(/状态:\s*([^\|]+)/);
+            if (statusMatch) {
+              currentIssue.status = statusMatch[1].trim();
+            }
+          }
+          
+          // 匹配指派人
+          if (currentIssue && line.includes('指派给:')) {
+            var assignMatch = line.match(/指派给:\s*(.+)/);
+            if (assignMatch) {
+              currentIssue.assignedTo = assignMatch[1].trim();
+            }
+          }
+        });
+        
+        if (currentIssue) {
+          issues.push(currentIssue);
+        }
+      }
+      
+      // 标准化格式
+      return issues.map(function(issue) {
+        var subject = typeof issue.subject === 'object' ? issue.subject.value : issue.subject;
+        return {
+          id: parseInt(issue.id),
+          subject: subject || '工单 #' + issue.id,
+          status: issue.status || '未知',
+          priority: issue.priority || 'P2-普通',
+          tracker: issue.tracker || 'UI设计',
+          assignedTo: issue.assignedTo || issue.assigned_to || ''
+        };
+      }).filter(function(issue) {
+        return issue.id && !isNaN(issue.id);
+      });
+    }
+
+    // ==================== UI ====================
+    
+    function filterIssues() {
+      var filter = document.getElementById('statusFilter').value;
+      var defaultStatuses = ['新建', 'UI设计中', '策划审核中'];
+      
+      if (filter === 'all') {
+        state.filteredIssues = state.issues;
+      } else if (filter === 'default') {
+        state.filteredIssues = state.issues.filter(function(issue) {
+          return defaultStatuses.indexOf(issue.status) !== -1;
+        });
+      } else {
+        state.filteredIssues = state.issues.filter(function(issue) {
+          return issue.status === filter;
+        });
+      }
+      
+      renderIssues();
+    }
+
+    function renderIssues() {
+      var list = document.getElementById('issueList');
+      var issues = state.filteredIssues;
+      
+      document.getElementById('issueCount').textContent = '(' + state.issues.length + '个)';
+      
+      if (issues.length === 0) {
+        if (state.issues.length === 0) {
+          list.innerHTML = '<div class="empty">点击"导入工单"添加数据</div>';
+        } else {
+          list.innerHTML = '<div class="empty">当前筛选条件下无工单</div>';
+        }
+        return;
+      }
+      
+      var html = '';
+      for (var i = 0; i < issues.length; i++) {
+        var issue = issues[i];
+        var selected = state.selectedIssue && state.selectedIssue.id === issue.id ? 'selected' : '';
+        var statusClass = issue.status ? 'status-' + issue.status : '';
+        
+        html += '<div class="issue-item ' + selected + '" data-id="' + issue.id + '">';
+        html += '<input type="radio" name="issue" ' + (selected ? 'checked' : '') + '>';
+        html += '<span class="issue-id">#' + issue.id + '</span>';
+        html += '<span class="issue-title" title="' + issue.subject + '">' + issue.subject + '</span>';
+        if (issue.status) {
+          html += '<span class="issue-status ' + statusClass + '">' + issue.status + '</span>';
+        }
+        html += '</div>';
+      }
+      list.innerHTML = html;
+      bindIssueClicks();
+    }
+
+    function bindIssueClicks() {
+      var items = document.querySelectorAll('.issue-item');
+      for (var i = 0; i < items.length; i++) {
+        items[i].onclick = function() {
+          var id = parseInt(this.getAttribute('data-id'));
+          for (var j = 0; j < state.issues.length; j++) {
+            if (state.issues[j].id === id) {
+              state.selectedIssue = state.issues[j];
+              break;
+            }
+          }
+          renderIssues();
+          updateButtons();
+        };
+      }
+    }
+
+    function updateSelection(data) {
+      var info = document.getElementById('selectionInfo');
+      
+      if (!data || !data.hasSelection) {
+        info.innerHTML = '<div class="empty">请在画布中选择一个元素</div>';
+        state.selection = null;
+      } else {
+        state.selection = data;
+        info.innerHTML = 
+          '<div class="node-name">' + data.name + '</div>' +
+          '<div class="node-type">' + data.type + '</div>' +
+          '<div class="node-url">' + (data.figmaUrl || '需要先设置 Figma 文件 URL') + '</div>';
+      }
+      
+      updateButtons();
+    }
+
+    function updateButtons() {
+      var canLink = state.selectedIssue && state.selection && state.selection.hasSelection;
+      var canCopy = state.selectedIssue && state.selection && state.selection.figmaUrl;
+      
+      document.getElementById('linkBtn').disabled = !canLink;
+      document.getElementById('copyPopoBtn').disabled = !canCopy;
+    }
+
+    function showToast(message, type) {
+      var toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = 'toast show ' + (type || '');
+      
+      setTimeout(function() {
+        toast.className = 'toast';
+      }, 3000);
+    }
+
+    // ==================== 事件绑定 ====================
+    
+    document.getElementById('toggleImportBtn').onclick = function() {
+      var area = document.getElementById('importArea');
+      if (area.style.display === 'none') {
+        area.style.display = 'block';
+        this.textContent = '✖ 关闭';
+      } else {
+        area.style.display = 'none';
+        this.textContent = '📥 导入工单';
+      }
+    };
+
+    document.getElementById('importBtn').onclick = function() {
+      var text = document.getElementById('importInput').value.trim();
+      if (!text) {
+        showToast('请粘贴工单数据', 'error');
+        return;
+      }
+      
+      var issues = parseImportData(text);
+      if (issues.length === 0) {
+        showToast('未能解析出工单数据', 'error');
+        return;
+      }
+      
+      // 合并到现有列表（去重）
+      var existingIds = state.issues.map(function(i) { return i.id; });
+      var newIssues = issues.filter(function(i) { return existingIds.indexOf(i.id) === -1; });
+      
+      state.issues = state.issues.concat(newIssues);
+      saveState();
+      filterIssues();
+      
+      document.getElementById('importInput').value = '';
+      document.getElementById('importArea').style.display = 'none';
+      document.getElementById('toggleImportBtn').textContent = '📥 导入工单';
+      
+      showToast('✅ 成功导入 ' + newIssues.length + ' 个新工单', 'success');
+    };
+
+    document.getElementById('loadSampleBtn').onclick = function() {
+      // 加载示例数据（王叶的工单）
+      var sample = [
+        { id: 449112, subject: "【半年庆】夏日节小bp-UI概念稿（双端）", status: "新建" },
+        { id: 447596, subject: "【半年庆】616 返场 - 小BP-UI设计（双端）", status: "新建" },
+        { id: 442018, subject: "【商业化】S8赛季故事活动-结算处理-UI", status: "UI设计中" },
+        { id: 441976, subject: "【商业化】S8赛季故事活动-UI设计（双端）", status: "UI设计中" },
+        { id: 434588, subject: "【半年庆】夏日节小bp-结算处理-UI", status: "新建" },
+        { id: 434551, subject: "【半年庆】夏日节小bp-UI设计（双端）", status: "新建" }
+      ];
+      document.getElementById('importInput').value = JSON.stringify(sample, null, 2);
+      showToast('已加载示例数据，点击导入', 'success');
+    };
+
+    document.getElementById('addManualBtn').onclick = function() {
+      var input = document.getElementById('manualInput');
+      var idText = input.value.trim().replace('#', '');
+      var id = parseInt(idText);
+      
+      if (!id || isNaN(id)) {
+        showToast('请输入有效的工单号', 'error');
+        return;
+      }
+      
+      // 检查是否已存在
+      var exists = state.issues.some(function(i) { return i.id === id; });
+      if (exists) {
+        showToast('工单已存在', 'error');
+        return;
+      }
+      
+      state.issues.push({
+        id: id,
+        subject: '工单 #' + id,
+        status: '未知'
+      });
+      
+      saveState();
+      filterIssues();
+      input.value = '';
+      showToast('✅ 已添加工单 #' + id, 'success');
+    };
+
+    document.getElementById('clearBtn').onclick = function() {
+      if (confirm('确定要清空所有工单吗？')) {
+        state.issues = [];
+        state.selectedIssue = null;
+        saveState();
+        filterIssues();
+        showToast('已清空', 'success');
+      }
+    };
+
+    document.getElementById('statusFilter').onchange = filterIssues;
+
+    document.getElementById('linkBtn').onclick = function() {
+      if (!state.selectedIssue || !state.selection) return;
+      
+      var issueUrl = 'https://' + REDMINE_HOST + '/issues/' + state.selectedIssue.id;
+      
+      parent.postMessage({
+        pluginMessage: {
+          type: 'add-hyperlink',
+          url: issueUrl,
+          nodeName: state.selection.name
+        }
+      }, '*');
+      
+      showToast('✅ 已添加链接到工单 #' + state.selectedIssue.id, 'success');
+    };
+
+    document.getElementById('copyPopoBtn').onclick = function() {
+      if (!state.selectedIssue || !state.selection || !state.selection.figmaUrl) return;
+      
+      var content = '【交互稿审核】\n';
+      content += '工单: #' + state.selectedIssue.id + ' ' + state.selectedIssue.subject + '\n';
+      content += '链接: ' + state.selection.figmaUrl + '\n';
+      content += '状态: ' + state.selectedIssue.status;
+      
+      var textArea = document.createElement('textarea');
+      textArea.value = content;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.select();
+      
+      try {
+        document.execCommand('copy');
+        showToast('✅ 已复制审核内容', 'success');
+      } catch (e) {
+        showToast('复制失败', 'error');
+      }
+      
+      document.body.removeChild(textArea);
+    };
+
+    // 回车添加工单
+    document.getElementById('manualInput').onkeypress = function(e) {
+      if (e.key === 'Enter') {
+        document.getElementById('addManualBtn').click();
+      }
+    };
+
+    // Figma 消息监听
+    window.onmessage = function(event) {
+      var msg = event.data.pluginMessage;
+      if (!msg) return;
+      
+      if (msg.type === 'selection-change') {
+        updateSelection(msg);
+      }
+    };
+
+    // ==================== 初始化 ====================
+    
+    function init() {
+      loadState();
+      filterIssues();
+    }
+
+    init();
+  </script>
+</body>
+</html>

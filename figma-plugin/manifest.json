@@ -1,0 +1,14 @@
+{
+  "name": "Figma-易协作同步工具",
+  "id": "1623982308904220992",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui/index.html",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["*"],
+    "devAllowedDomains": ["http://localhost:3000"],
+    "reasoning": "Plugin needs to connect to local backend service"
+  }
+}

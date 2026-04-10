@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>测试直连易协作 API</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    .result { background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 10px 0; white-space: pre-wrap; font-family: monospace; font-size: 12px; max-height: 400px; overflow: auto; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    textarea { width: 100%; height: 80px; margin: 10px 0; }
+    .success { color: green; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+  <h1>🧪 测试 Figma 插件直连易协作 API</h1>
+  
+  <p>请粘贴你的 <code>_my_redmine</code> Cookie:</p>
+  <textarea id="cookie" placeholder="粘贴 Cookie 值...">BAh7EEkiCXVzZXIGOgZFRnsHSSIJMTYxNwY7AFRpAqMGSSIJMjAwNwY7AFRpAkoBSSIPbXlfdXNlcl9pZAY7AEZpAoZVSSIOdXNlcl9uYW1lBjsARkkiDFfnjovlj7YGOwBUSSIOdXNlcl9tYWlsBjsARkkiHmd6d2FuZ3llQGNvcnAubmV0ZWFzZS5jb20GOwBUSSIKY3RpbWUGOwBGbCsHJ1meaUkiCmF0aW1lBjsARmwrB1Rs12lJIg9zZXNzaW9uX2lkBjsAVEkiJWQzMzA5Y2RiY2UyNTM2Nzk2N2E1YTY2YzYxZGExYjkyBjsAVEkiEF9jc3JmX3Rva2VuBjsARkkiMXkwNEZMUi8wZVRRUjR5YzYydW8vR3JFNjhsS2pScEZKOW50L2dPd1gySVk9BjsARkkiHmxhc3Rfc2VsZWN0ZWRfaW5zX3Byb2plY3QGOwBGewdJIgkxNjE3BjsAVGkMSSIJMjAwNwY7AFRpDEkiH2lzc3VlX3Nob3dzX3JlbGF0aW9uc19zb3J0BjsARkkiDXNubzpkZXNjBjsAVEkiDXBlcl9wYWdlBjsARmlp--9f0f72cc09eeded93dc26317fd9f12ccff9f77e6</textarea>
+
+  <div>
+    <button onclick="testDirectApi()">🔗 测试直连 API (带 Cookie Header)</button>
+    <button onclick="testNoCookie()">❌ 测试无 Cookie</button>
+  </div>
+
+  <div id="result" class="result">点击按钮测试...</div>
+
+  <script>
+    function log(msg, isError) {
+      var result = document.getElementById('result');
+      var cls = isError ? 'error' : 'success';
+      result.innerHTML += '<span class="' + cls + '">' + msg + '</span>\n';
+    }
+
+    function clearLog() {
+      document.getElementById('result').innerHTML = '';
+    }
+
+    // 测试直接调用易协作 API
+    async function testDirectApi() {
+      clearLog();
+      var cookie = document.getElementById('cookie').value.trim();
+      
+      log('📡 测试直连易协作 API...');
+      log('Cookie: ' + cookie.substring(0, 30) + '...');
+      
+      var url = 'https://x20.pm.netease.com/api/v6/issues';
+      var body = {
+        project_id: 7,
+        set_filter: 1,
+        mode: 'preview',
+        per_page: 5,
+        filters: {
+          assigned_to_id: { operator: '=', values: ['me'] }
+        }
+      };
+      
+      log('\n请求 URL: ' + url);
+      log('请求方法: POST');
+      log('请求体: ' + JSON.stringify(body, null, 2));
+      
+      try {
+        var response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Cookie': '_my_redmine=' + cookie
+          },
+          body: JSON.stringify(body)
+        });
+        
+        log('\n响应状态: ' + response.status);
+        
+        var data = await response.json();
+        log('\n响应数据:');
+        log(JSON.stringify(data, null, 2));
+        
+        if (data.res_code === 1) {
+          log('\n✅ 成功！获取到 ' + (data.data?.list?.length || 0) + ' 个工单', false);
+        } else {
+          log('\n❌ 失败: ' + data.res_msg, true);
+        }
+      } catch (error) {
+        log('\n❌ 请求失败:', true);
+        log(error.message, true);
+        log('\n这可能是 CORS 跨域限制导致的。', true);
+        log('浏览器控制台可能有更详细的错误信息。', true);
+      }
+    }
+
+    // 测试无 Cookie 请求
+    async function testNoCookie() {
+      clearLog();
+      
+      log('📡 测试无 Cookie 请求...');
+      
+      var url = 'https://x20.pm.netease.com/api/v6/issues';
+      
+      try {
+        var response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ project_id: 7, set_filter: 1 })
+        });
+        
+        var data = await response.json();
+        log('\n响应: ' + JSON.stringify(data, null, 2));
+      } catch (error) {
+        log('\n❌ 请求失败: ' + error.message, true);
+      }
+    }
+  </script>
+</body>
+</html>

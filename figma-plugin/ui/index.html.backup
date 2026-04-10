@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Figma-易协作同步工具</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; font-size: 12px; padding: 12px; background: #fff; }
+    
+    .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #e5e5e5; margin-bottom: 12px; }
+    .header h1 { font-size: 14px; }
+    .status { font-size: 11px; color: #666; }
+    .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+    .status-dot.online { background: #22c55e; }
+    .status-dot.offline { background: #ef4444; }
+    
+    .section { background: #f7f7f7; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+    .section-title { font-size: 12px; font-weight: bold; margin-bottom: 8px; }
+    
+    .add-box { display: flex; gap: 6px; margin-bottom: 8px; }
+    .add-box input { flex: 1; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; }
+    
+    .filter-box { margin-bottom: 8px; }
+    .filter-box select { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; background: white; }
+    
+    .issue-status { font-size: 9px; padding: 2px 4px; border-radius: 3px; background: #e5e5e5; color: #666; margin-left: 4px; white-space: nowrap; }
+    .issue-status.status-新建 { background: #dbeafe; color: #1d4ed8; }
+    .issue-status.status-UI设计中 { background: #fef3c7; color: #d97706; }
+    .issue-status.status-策划审核中 { background: #fce7f3; color: #be185d; }
+    .issue-status.status-跟进验收联调 { background: #d1fae5; color: #059669; }
+    .issue-status.status-已关闭 { background: #f3f4f6; color: #9ca3af; }
+    
+    /* 安装引导样式 */
+    .install-guide { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 16px; margin: 10px 0; }
+    .install-guide h3 { margin: 0 0 12px 0; font-size: 14px; color: #92400e; }
+    .guide-steps { margin-bottom: 12px; }
+    .guide-steps .step { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #fde68a; }
+    .guide-steps .step:last-child { border-bottom: none; }
+    .step-num { background: #f59e0b; color: white; width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; flex-shrink: 0; }
+    .guide-steps code { background: #fef3c7; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+    .cmd-preview { background: #1e293b; color: #94a3b8; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 10px; margin: 10px 0; word-break: break-all; }
+    
+    /* 按钮悬停提示 */
+    .btn-with-tooltip { position: relative; }
+    .btn-with-tooltip::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+      pointer-events: none;
+      z-index: 100;
+      margin-bottom: 4px;
+    }
+    .btn-with-tooltip:hover::after {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .btn { padding: 8px 12px; border: none; border-radius: 6px; font-size: 11px; cursor: pointer; }
+    .btn-small { padding: 6px 10px; }
+    .btn-primary { background: #0066ff; color: white; }
+    .btn-warning { background: #f59e0b; color: white; }
+    .btn-secondary { background: #e5e5e5; color: #333; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    .issue-list { max-height: 150px; overflow-y: auto; }
+    .issue-item { display: flex; align-items: center; gap: 8px; padding: 8px; background: white; border-radius: 6px; margin-bottom: 4px; cursor: pointer; border: 2px solid transparent; }
+    .issue-item:hover { background: #f0f7ff; }
+    .issue-item.selected { border-color: #0066ff; background: #f0f7ff; }
+    .issue-id { color: #0066ff; font-weight: bold; }
+    .issue-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    
+    .selection-info { background: white; padding: 10px; border-radius: 6px; }
+    .node-name { font-weight: bold; margin-bottom: 4px; }
+    .node-type { font-size: 10px; background: #e5e5e5; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px; }
+    .node-url { font-size: 10px; color: #0066ff; word-break: break-all; }
+    
+    .actions { display: flex; gap: 8px; margin-bottom: 8px; }
+    .actions .btn { flex: 1; }
+    
+    .record-list { max-height: 100px; overflow-y: auto; }
+    .record-item { background: white; padding: 6px 8px; border-radius: 4px; margin-bottom: 4px; font-size: 11px; }
+    
+    .empty { text-align: center; color: #999; padding: 16px; }
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 8px; display: none; }
+    .toast.show { display: block; }
+    .toast.success { background: #22c55e; }
+    .toast.error { background: #ef4444; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <h1>🔗 Figma-易协作同步</h1>
+      <button class="btn btn-small btn-secondary" id="openToolBtn" title="打开后端同步工具">⚙️</button>
+    </div>
+    <div class="status" id="serverStatus">
+      <span class="status-dot offline"></span>
+      <span>检查服务...</span>
+    </div>
+  </div>
+
+  <!-- 安装引导区域 -->
+  <div id="installGuideArea" style="display:none;"></div>
+
+  <!-- API Key 配置区域 -->
+  <div id="apiKeyArea" style="display:none;">
+    <div class="install-guide" style="background:#eff6ff; border-color:#93c5fd;">
+      <h3 style="color:#1e40af;">🔑 配置易协作 API Key</h3>
+      <p style="font-size:11px; color:#64748b; margin:8px 0;">每个用户需要配置自己的 API Key 才能获取工单</p>
+      <div class="guide-steps">
+        <div class="step" style="border-color:#bfdbfe;">
+          <span class="step-num" style="background:#3b82f6;">1</span>
+          <span>打开易协作 → 右上角头像 → <b>偏好设置</b></span>
+        </div>
+        <div class="step" style="border-color:#bfdbfe;">
+          <span class="step-num" style="background:#3b82f6;">2</span>
+          <span>点击 <b>API KEY</b> 页签 → 创建 → 复制</span>
+        </div>
+        <div class="step" style="border-color:#bfdbfe;">
+          <span class="step-num" style="background:#3b82f6;">3</span>
+          <span>粘贴到下方输入框</span>
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:10px;">
+        <input type="text" id="apiKeyInput" placeholder="粘贴你的 API Key" style="flex:1; padding:8px; border:1px solid #93c5fd; border-radius:4px; font-size:12px;">
+        <button class="btn btn-primary" id="saveApiKeyBtn">保存</button>
+      </div>
+      <div style="margin-top:8px; font-size:10px; color:#64748b;">
+        💡 API Key 会保存在本地，不会上传到服务器
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📋 我的工单 <span id="issueCount"></span></div>
+    <div class="add-box">
+      <input type="text" id="issueInput" placeholder="输入工单号，如 447596">
+      <button class="btn btn-small btn-primary" id="addBtn">添加</button>
+      <button class="btn btn-small btn-secondary" id="deleteBtn" disabled title="选中工单后可删除">删除</button>
+    </div>
+    <div class="filter-box">
+      <select id="statusFilter">
+        <option value="default" selected>默认（新建/设计中/审核中）</option>
+        <option value="all">全部状态</option>
+        <option value="新建">新建</option>
+        <option value="UI设计中">UI设计中</option>
+        <option value="策划审核中">策划审核中</option>
+        <option value="跟进验收联调">跟进验收联调</option>
+        <option value="已关闭">已关闭</option>
+      </select>
+    </div>
+    <div class="issue-list" id="issueList">
+      <div class="empty">加载中...</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">📍 Figma 设计稿链接</div>
+    <div class="add-box">
+      <input type="text" id="figmaUrlInput" placeholder="从浏览器地址栏粘贴 Figma 链接">
+      <button class="btn btn-small btn-primary" id="setFigmaUrlBtn">确定</button>
+    </div>
+    <div class="selection-info" id="selectionInfo">
+      <div class="empty">⬆️ 请粘贴当前设计稿的链接</div>
+    </div>
+  </div>
+
+  <div class="actions" style="position:relative; overflow:visible;">
+    <button class="btn btn-primary btn-with-tooltip" id="linkBtn" disabled data-tooltip="为文本节点附加易协作工单link">🔗 关联到节点</button>
+    <button class="btn btn-primary btn-with-tooltip" id="syncBtn" disabled data-tooltip="同步figma链接到该易协作工单中">📤 同步到易协作</button>
+  </div>
+  
+  <div class="section" id="popoPreviewSection" style="display:none;">
+    <div class="section-title">📝 审核内容预览 <span style="font-size:10px;color:#666;">(可编辑)</span></div>
+    <textarea id="popoMessagePreview" rows="6" style="width:100%;font-size:11px;padding:8px;border:1px solid #ddd;border-radius:4px;resize:vertical;"></textarea>
+  </div>
+  
+  <div class="actions" style="position:relative; overflow:visible;">
+    <button class="btn btn-warning btn-with-tooltip" id="copyPopoBtn" disabled data-tooltip="复制审核内容到剪贴板">📋 复制审核内容</button>
+  </div>
+
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    var API = 'http://localhost:3000';
+    var STORAGE_KEY = 'figma-redmine-sync';
+    var state = { issues: [], filteredIssues: [], selectedIssue: null, selection: null, fileUrl: '', fileKey: '', fileName: '', baseFileUrl: '' };
+
+    // 从服务器恢复保存的数据（因为 Figma 插件 iframe 可能不支持 localStorage）
+    function loadSavedState() {
+      // 先尝试从 Figma clientStorage 加载
+      parent.postMessage({ pluginMessage: { type: 'load-storage' } }, '*');
+      
+      // 同时尝试 localStorage 作为备用
+      try {
+        var saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          applySavedState(JSON.parse(saved));
+        }
+      } catch (e) {
+        console.log('localStorage 不可用，使用 Figma clientStorage');
+      }
+      
+      // 也从后端加载
+      fetch(API + '/api/settings/figma-url')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.fileKey) {
+            applySavedState(d);
+          }
+        })
+        .catch(function(e) { console.log('后端设置加载失败'); });
+    }
+    
+    // 应用保存的状态
+    function applySavedState(data) {
+      if (data && data.fileKey) {
+        state.fileKey = data.fileKey;
+        state.baseFileUrl = data.baseFileUrl || '';
+        document.getElementById('figmaUrlInput').placeholder = '文件已记住: ' + data.fileKey.substring(0, 8) + '...';
+        
+        // 如果有保存的 Figma URL，恢复显示
+        if (data.lastFigmaUrl && (!state.selection || !state.selection.figmaUrl)) {
+          state.selection = {
+            hasSelection: true,
+            id: 'manual',
+            name: '上次记录的链接',
+            type: 'URL',
+            figmaUrl: data.lastFigmaUrl
+          };
+          updateSelection(state.selection);
+        }
+      }
+    }
+
+    // 保存状态到多个存储位置
+    function saveState() {
+      var data = {
+        fileKey: state.fileKey,
+        baseFileUrl: state.baseFileUrl,
+        lastFigmaUrl: state.selection ? state.selection.figmaUrl : null
+      };
+      
+      // 保存到 localStorage（备用）
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (e) {
+        console.log('localStorage 保存失败');
+      }
+      
+      // 保存到 Figma clientStorage
+      parent.postMessage({ pluginMessage: { type: 'save-storage', data: data } }, '*');
+      
+      // 保存到后端
+      fetch(API + '/api/settings/figma-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      }).catch(function(e) { console.log('后端保存失败'); });
+    }
+
+    // 后端下载地址
+    var BACKEND_DOWNLOAD_URL = 'https://github.com/w406705987-debug/figma-redmine-sync/releases/download/v1.0.0/figma-redmine-sync.zip';
+    // 安装目录
+    var INSTALL_DIR = 'C:\\FigmaSync';
+    // API Key 存储键
+    var API_KEY_STORAGE = 'figma-redmine-api-key';
+
+    // 加载 API Key
+    function loadApiKey() {
+      var apiKey = '';
+      try {
+        apiKey = localStorage.getItem(API_KEY_STORAGE) || '';
+      } catch (e) {}
+      return apiKey;
+    }
+
+    // 保存 API Key
+    function saveApiKey(apiKey) {
+      try {
+        localStorage.setItem(API_KEY_STORAGE, apiKey);
+      } catch (e) {}
+      
+      // 同时保存到后端
+      fetch(API + '/api/settings/api-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: apiKey })
+      }).then(function() {
+        showToast('✅ API Key 已保存', 'success');
+        hideApiKeyArea();
+        loadIssues(); // 重新加载工单
+      }).catch(function(e) {
+        showToast('保存失败: ' + e.message, 'error');
+      });
+    }
+
+    // 显示 API Key 配置区域
+    function showApiKeyArea() {
+      document.getElementById('apiKeyArea').style.display = 'block';
+      var savedKey = loadApiKey();
+      if (savedKey) {
+        document.getElementById('apiKeyInput').value = savedKey;
+      }
+    }
+
+    // 隐藏 API Key 配置区域
+    function hideApiKeyArea() {
+      document.getElementById('apiKeyArea').style.display = 'none';
+    }
+
+    // 保存 API Key 按钮事件
+    document.getElementById('saveApiKeyBtn').onclick = function() {
+      var apiKey = document.getElementById('apiKeyInput').value.trim();
+      if (!apiKey) {
+        showToast('请输入 API Key', 'error');
+        return;
+      }
+      saveApiKey(apiKey);
+    };
+    
+    // 生成 PowerShell 安装命令
+    function getPowerShellCommand() {
+      var cmd = '';
+      cmd += '$url = "' + BACKEND_DOWNLOAD_URL + '"; ';
+      cmd += '$dir = "' + INSTALL_DIR + '"; ';
+      cmd += '$zip = "$dir\\figma-sync.zip"; ';
+      cmd += 'New-Item -ItemType Directory -Force -Path $dir | Out-Null; ';
+      cmd += 'Write-Host "正在下载..." -ForegroundColor Cyan; ';
+      cmd += 'Invoke-WebRequest -Uri $url -OutFile $zip; ';
+      cmd += 'Write-Host "正在解压..." -ForegroundColor Cyan; ';
+      cmd += 'Expand-Archive -Path $zip -DestinationPath $dir -Force; ';
+      cmd += 'Remove-Item $zip; ';
+      cmd += 'Write-Host "安装完成！" -ForegroundColor Green; ';
+      cmd += 'Write-Host "正在启动服务..." -ForegroundColor Cyan; ';
+      cmd += 'Set-Location "$dir\\figma-redmine-sync\\backend"; ';
+      cmd += 'npm install; ';
+      cmd += 'node server.js';
+      return cmd;
+    }
+    
+    // 显示安装引导
+    function showInstallGuide() {
+      var guideHtml = '<div class="install-guide">';
+      guideHtml += '<h3>🚀 首次使用？请先安装后端服务</h3>';
+      guideHtml += '<div class="guide-steps">';
+      guideHtml += '<div class="step"><span class="step-num">1</span><span>按 <code>Win + X</code>，选择 <b>PowerShell</b> 或 <b>终端</b></span></div>';
+      guideHtml += '<div class="step"><span class="step-num">2</span><span>复制下方命令</span><button class="btn btn-small btn-primary" id="copyInstallCmdBtn">📋 复制命令</button></div>';
+      guideHtml += '<div class="step"><span class="step-num">3</span><span>粘贴到 PowerShell 窗口，按回车执行</span></div>';
+      guideHtml += '<div class="step"><span class="step-num">4</span><span>等待安装完成，保持窗口打开</span></div>';
+      guideHtml += '</div>';
+      guideHtml += '<div class="cmd-preview" id="cmdPreview"></div>';
+      guideHtml += '<button class="btn btn-secondary" id="retryConnectBtn">🔄 重新检测连接</button>';
+      guideHtml += '</div>';
+      
+      document.getElementById('installGuideArea').innerHTML = guideHtml;
+      document.getElementById('installGuideArea').style.display = 'block';
+      
+      // 显示命令预览（简化版）
+      document.getElementById('cmdPreview').textContent = '# 一键安装并启动服务 (安装到 ' + INSTALL_DIR + ')';
+      
+      // 绑定复制命令按钮
+      document.getElementById('copyInstallCmdBtn').onclick = function() {
+        var cmd = getPowerShellCommand();
+        var textArea = document.createElement('textarea');
+        textArea.value = cmd;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        
+        try {
+          document.execCommand('copy');
+          showToast('✅ 命令已复制！请粘贴到 PowerShell', 'success');
+        } catch (e) {
+          showToast('复制失败', 'error');
+        }
+        
+        document.body.removeChild(textArea);
+      };
+      
+      // 绑定重试按钮
+      document.getElementById('retryConnectBtn').onclick = function() {
+        showToast('正在检测连接...', 'success');
+        checkServer();
+      };
+    }
+    
+    // 隐藏安装引导
+    function hideInstallGuide() {
+      document.getElementById('installGuideArea').style.display = 'none';
+    }
+
+    // 打开同步工具指南
+    document.getElementById('openToolBtn').onclick = function() {
+      var guide = '📖 启动后端同步工具指南\n\n';
+      guide += '【已安装用户】\n';
+      guide += '━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+      guide += '打开 ' + INSTALL_DIR + '\\figma-redmine-sync\n';
+      guide += '双击 start.bat 即可启动服务\n\n';
+      guide += '【首次安装】\n';
+      guide += '━━━━━━━━━━━━━━━━━━━━━━━━━━\n';
+      guide += '1. Win+X 打开 PowerShell\n';
+      guide += '2. 复制安装命令（点击下方按钮）\n';
+      guide += '3. 粘贴到 PowerShell 执行\n\n';
+      guide += '点击「确定」复制安装命令';
+      
+      if (confirm(guide)) {
+        var cmd = getPowerShellCommand();
+        var textArea = document.createElement('textarea');
+        textArea.value = cmd;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        showToast('✅ 安装命令已复制', 'success');
+      }
+    };
+
+    // 检查服务
+    function checkServer() {
+      fetch(API + '/health')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          document.querySelector('#serverStatus .status-dot').className = 'status-dot online';
+          document.querySelector('#serverStatus span:last-child').textContent = '服务已连接';
+          hideInstallGuide();
+          loadIssues();
+        })
+        .catch(function(e) {
+          document.querySelector('#serverStatus .status-dot').className = 'status-dot offline';
+          document.querySelector('#serverStatus span:last-child').textContent = '服务未启动';
+          showInstallGuide();
+        });
+    }
+
+    // 加载工单
+    function loadIssues() {
+      fetch(API + '/api/redmine/issues')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          // 检查是否需要配置 API Key
+          if (d.needApiKey) {
+            showApiKeyArea();
+            document.getElementById('issueList').innerHTML = '<div class="empty">请先配置 API Key</div>';
+            return;
+          }
+          
+          hideApiKeyArea();
+          state.issues = d.issues || [];
+          document.getElementById('issueCount').textContent = '(' + state.issues.length + '个)';
+          filterIssues(); // 应用当前筛选条件
+        })
+        .catch(function(e) {
+          document.getElementById('issueList').innerHTML = '<div class="empty">加载失败</div>';
+        });
+    }
+
+    // 筛选工单
+    function filterIssues() {
+      var filter = document.getElementById('statusFilter').value;
+      var defaultStatuses = ['新建', 'UI设计中', '策划审核中'];
+      
+      if (filter === 'all') {
+        state.filteredIssues = state.issues;
+      } else if (filter === 'default') {
+        // 默认 = 只显示 新建/UI设计中/策划审核中
+        state.filteredIssues = state.issues.filter(function(issue) {
+          var status = issue.status || '';
+          return defaultStatuses.indexOf(status) !== -1;
+        });
+      } else {
+        // 按指定状态筛选
+        state.filteredIssues = state.issues.filter(function(issue) {
+          return issue.status === filter;
+        });
+      }
+      
+      renderIssues();
+    }
+
+    // 渲染工单列表
+    function renderIssues() {
+      var list = document.getElementById('issueList');
+      var issues = state.filteredIssues.length > 0 || document.getElementById('statusFilter').value !== 'all' 
+                   ? state.filteredIssues 
+                   : state.issues;
+      
+      if (issues.length === 0) {
+        if (state.issues.length === 0) {
+          list.innerHTML = '<div class="empty">暂无工单，请输入工单号添加</div>';
+        } else {
+          list.innerHTML = '<div class="empty">当前筛选条件下无工单</div>';
+        }
+        return;
+      }
+      
+      var html = '';
+      for (var i = 0; i < issues.length; i++) {
+        var issue = issues[i];
+        var selected = state.selectedIssue && state.selectedIssue.id === issue.id ? 'selected' : '';
+        var statusClass = issue.status ? 'status-' + issue.status : '';
+        
+        html += '<div class="issue-item ' + selected + '" data-id="' + issue.id + '">';
+        html += '<input type="radio" name="issue" ' + (selected ? 'checked' : '') + '>';
+        html += '<span class="issue-id">#' + issue.id + '</span>';
+        html += '<span class="issue-title" title="' + issue.subject + '">' + issue.subject + '</span>';
+        if (issue.status) {
+          html += '<span class="issue-status ' + statusClass + '">' + issue.status + '</span>';
+        }
+        html += '</div>';
+      }
+      list.innerHTML = html;
+      bindIssueClicks();
+    }
+
+    // 绑定工单点击
+    function bindIssueClicks() {
+      var items = document.querySelectorAll('.issue-item');
+      for (var i = 0; i < items.length; i++) {
+        items[i].onclick = function() {
+          var id = parseInt(this.getAttribute('data-id'));
+          for (var j = 0; j < state.issues.length; j++) {
+            if (state.issues[j].id === id) {
+              state.selectedIssue = state.issues[j];
+              break;
+            }
+          }
+          renderIssues();
+          updateButtons();
+        };
+      }
+    }
+
+    // 更新选中节点显示
+    function updateSelection(sel) {
+      state.selection = sel;
+      var div = document.getElementById('selectionInfo');
+      if (!sel || !sel.hasSelection) {
+        div.innerHTML = '<div class="empty">请在 Figma 中选中一个节点</div>';
+      } else {
+        div.innerHTML = '<div class="node-name">' + sel.name + '</div>' +
+          '<span class="node-type">' + sel.type + '</span>' +
+          '<div class="node-url">' + sel.figmaUrl + '</div>';
+      }
+      updateButtons();
+    }
+
+    // 生成审核消息内容
+    function generatePopoMessage() {
+      if (!state.selectedIssue || !state.selection || !state.selection.figmaUrl) {
+        return '';
+      }
+      
+      var issueUrl = 'https://x20.pm.netease.com/issues/' + state.selectedIssue.id;
+      
+      var msg = '【交互文档提审】\n\n';
+      msg += '【易协作单号】\n';
+      msg += '#' + state.selectedIssue.id + ' ' + state.selectedIssue.subject + '\n';
+      msg += issueUrl + '\n\n';
+      msg += '【交互文档链接】\n';
+      msg += state.selection.figmaUrl + '\n\n';
+      msg += '请审核';
+      
+      return msg;
+    }
+
+    // 更新审核内容预览
+    function updatePopoPreview() {
+      var hasIssue = !!state.selectedIssue;
+      var hasSel = state.selection && state.selection.hasSelection && state.selection.figmaUrl;
+      var previewSection = document.getElementById('popoPreviewSection');
+      var previewTextarea = document.getElementById('popoMessagePreview');
+      
+      if (hasIssue && hasSel) {
+        previewSection.style.display = 'block';
+        // 只有当内容为空时才自动生成，否则保留用户编辑的内容
+        if (!previewTextarea.value || previewTextarea.dataset.autoGenerated === 'true') {
+          previewTextarea.value = generatePopoMessage();
+          previewTextarea.dataset.autoGenerated = 'true';
+        }
+      } else {
+        previewSection.style.display = 'none';
+        previewTextarea.value = '';
+        previewTextarea.dataset.autoGenerated = 'true';
+      }
+    }
+
+    // 当用户手动编辑内容时，标记为非自动生成
+    document.getElementById('popoMessagePreview').oninput = function() {
+      this.dataset.autoGenerated = 'false';
+    };
+
+    // 更新按钮状态
+    function updateButtons() {
+      var hasIssue = !!state.selectedIssue;
+      var hasSel = state.selection && state.selection.hasSelection && state.selection.figmaUrl;
+      var hasRealNode = state.selection && state.selection.hasSelection && state.selection.id && state.selection.id !== 'manual';
+      
+      // 删除按钮：需要选中工单
+      document.getElementById('deleteBtn').disabled = !hasIssue;
+      // 关联按钮：需要选中工单 + 选中真实节点（非手动输入）
+      document.getElementById('linkBtn').disabled = !(hasIssue && hasRealNode);
+      // 同步按钮：需要选中工单 + 有 Figma 链接
+      document.getElementById('syncBtn').disabled = !(hasIssue && hasSel);
+      // 复制按钮：需要选中工单 + 有 Figma 链接
+      document.getElementById('copyPopoBtn').disabled = !(hasIssue && hasSel);
+      
+      // 更新审核内容预览
+      updatePopoPreview();
+    }
+
+    // 复制审核内容按钮
+    document.getElementById('copyPopoBtn').onclick = function() {
+      var content = document.getElementById('popoMessagePreview').value;
+      if (!content) return;
+      
+      var textArea = document.createElement('textarea');
+      textArea.value = content;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.select();
+      
+      try {
+        document.execCommand('copy');
+        showToast('✅ 已复制到剪贴板，可手动粘贴到POPO', 'success');
+      } catch (e) {
+        showToast('复制失败', 'error');
+      }
+      
+      document.body.removeChild(textArea);
+    };
+
+    // 删除工单
+    document.getElementById('deleteBtn').onclick = function() {
+      if (!state.selectedIssue) return;
+      
+      var issueId = state.selectedIssue.id;
+      if (!confirm('确定要删除工单 #' + issueId + ' 吗？')) return;
+      
+      fetch(API + '/api/redmine/issues/' + issueId, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      })
+      .then(function(r) { 
+        console.log('删除响应状态:', r.status);
+        return r.json(); 
+      })
+      .then(function(d) {
+        console.log('删除响应数据:', d);
+        if (d.success) {
+          showToast('已删除工单 #' + issueId, 'success');
+          state.selectedIssue = null;
+          updateButtons();
+          loadIssues();
+        } else {
+          showToast('删除失败: ' + (d.error || '未知错误'), 'error');
+        }
+      })
+      .catch(function(e) { 
+        console.error('删除异常:', e);
+        showToast('删除失败: ' + e.message, 'error'); 
+      });
+    };
+
+    // 筛选器变化事件
+    document.getElementById('statusFilter').onchange = function() {
+      filterIssues();
+    };
+
+    // 关联到节点（给 Figma 节点添加易协作链接）
+    document.getElementById('linkBtn').onclick = function() {
+      if (!state.selectedIssue || !state.selection || !state.selection.id) return;
+      
+      // 构建易协作工单链接
+      var issueUrl = 'https://x20.pm.netease.com/issues/' + state.selectedIssue.id;
+      
+      // 发送消息给 Figma 主线程，添加超链接
+      // 注意：消息类型必须是 'set-hyperlink' 才能被 code.js 正确处理
+      parent.postMessage({
+        pluginMessage: {
+          type: 'set-hyperlink',
+          nodeId: state.selection.id,
+          url: issueUrl,
+          issueId: state.selectedIssue.id,
+          issueTitle: state.selectedIssue.subject
+        }
+      }, '*');
+      
+      showToast('正在关联到节点...', 'success');
+    };
+
+    // 添加工单
+    document.getElementById('addBtn').onclick = function() {
+      var input = document.getElementById('issueInput');
+      var val = input.value.trim();
+      var match = val.match(/\d+/);
+      if (!match) { showToast('请输入有效的工单号', 'error'); return; }
+      var id = parseInt(match[0]);
+      
+      fetch(API + '/api/redmine/issues', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        showToast('已添加工单 #' + id, 'success');
+        input.value = '';
+        loadIssues();
+      })
+      .catch(function(e) { showToast('添加失败', 'error'); });
+    };
+
+    // 同步链接到易协作（复制内容到剪贴板，用户手动粘贴）
+    document.getElementById('syncBtn').onclick = function() {
+      if (!state.selectedIssue || !state.selection || !state.selection.figmaUrl) return;
+      
+      // 构建要复制的内容（Figma链接）
+      var figmaContent = '【交互文档链接】\n' + state.selection.figmaUrl;
+      var issueUrl = 'https://x20.pm.netease.com/issues/' + state.selectedIssue.id;
+      
+      // 使用传统方式复制到剪贴板
+      var textArea = document.createElement('textarea');
+      textArea.value = figmaContent;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.select();
+      
+      var copySuccess = false;
+      try {
+        copySuccess = document.execCommand('copy');
+      } catch (e) {
+        console.error('Copy failed:', e);
+      }
+      document.body.removeChild(textArea);
+      
+      if (copySuccess) {
+        // 显示确认弹窗，点确定自动打开工单页面
+        var msg = '✅ Figma链接已复制到剪贴板！\n\n';
+        msg += '点击「确定」打开易协作工单页面\n';
+        msg += '然后在描述中粘贴(Ctrl+V)即可';
+        
+        if (confirm(msg)) {
+          // 用户点击确定，打开工单页面
+          // 通过创建 a 标签并触发点击来打开链接
+          var link = document.createElement('a');
+          link.href = issueUrl;
+          link.target = '_blank';
+          link.click();
+        }
+        
+        showToast('链接已复制', 'success');
+      } else {
+        // 复制失败，显示内容让用户手动复制
+        var msg = '请手动复制以下内容：\n\n' + figmaContent + '\n\n然后粘贴到工单：\n' + issueUrl;
+        if (confirm(msg + '\n\n点击确定打开工单页面')) {
+          var link = document.createElement('a');
+          link.href = issueUrl;
+          link.target = '_blank';
+          link.click();
+        }
+        showToast('请手动复制', 'error');
+      }
+    };
+
+    // Toast
+    function showToast(msg, type) {
+      var toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.className = 'toast show ' + (type || '');
+      setTimeout(function() { toast.className = 'toast'; }, 3000);
+    }
+
+    // 监听Figma消息
+    window.onmessage = function(e) {
+      var msg = e.data.pluginMessage;
+      if (!msg) return;
+      if (msg.type === 'init') {
+        state.fileUrl = msg.data.fileUrl;
+        state.fileKey = msg.data.fileKey;
+        state.fileName = msg.data.fileName;
+        updateSelection(msg.data.selection);
+        // 如果获取到了 fileKey，显示提示
+        if (msg.data.fileKey) {
+          console.log('Figma 文件信息: ', msg.data.fileKey, msg.data.fileName);
+        }
+      } else if (msg.type === 'selection-changed' || msg.type === 'selection-result') {
+        // 同时保存 fileKey 信息
+        if (msg.data.fileKey) {
+          state.fileKey = msg.data.fileKey;
+        }
+        if (msg.data.fileName) {
+          state.fileName = msg.data.fileName;
+        }
+        
+        // 如果已经有 file key，自动为选中节点生成链接
+        if (state.fileKey && msg.data.hasSelection && msg.data.id) {
+          msg.data.figmaUrl = buildNodeUrl(state.fileKey, msg.data.id);
+        }
+        
+        updateSelection(msg.data);
+      } else if (msg.type === 'hyperlink-result') {
+        if (msg.data.success) showToast('已添加链接', 'success');
+        else showToast(msg.data.error, 'error');
+      } else if (msg.type === 'storage-loaded') {
+        // 从 Figma clientStorage 加载的数据
+        applySavedState(msg.data);
+      }
+    };
+
+    // 从 Figma URL 中提取 file key
+    function extractFileKey(url) {
+      // 支持多种 Figma URL 格式:
+      // https://www.figma.com/file/ABC123/FileName
+      // https://www.figma.com/design/ABC123/FileName
+      // https://www.figma.com/proto/ABC123/FileName
+      var match = url.match(/figma\.com\/(file|design|proto)\/([a-zA-Z0-9]+)/);
+      if (match) {
+        return match[2];
+      }
+      return null;
+    }
+
+    // 根据 file key 和 node id 生成节点链接
+    function buildNodeUrl(fileKey, nodeId) {
+      return 'https://www.figma.com/design/' + fileKey + '?node-id=' + encodeURIComponent(nodeId);
+    }
+
+    // 设置 Figma URL (提取 file key 用于后续自动生成链接)
+    document.getElementById('setFigmaUrlBtn').onclick = function() {
+      var url = document.getElementById('figmaUrlInput').value.trim();
+      if (!url) {
+        showToast('请输入 Figma 链接', 'error');
+        return;
+      }
+      
+      // 提取 file key
+      var extractedKey = extractFileKey(url);
+      if (extractedKey) {
+        state.fileKey = extractedKey;
+        // 提取基础 URL (不含 node-id 参数)
+        state.baseFileUrl = url.split('?')[0];
+        showToast('✅ 已记住文件，之后选中节点会自动生成链接', 'success');
+        document.getElementById('figmaUrlInput').value = '';
+        document.getElementById('figmaUrlInput').placeholder = '文件已记住: ' + extractedKey.substring(0, 8) + '...';
+      }
+      
+      // 同时为当前状态设置链接
+      if (state.selection && state.selection.id && state.selection.id !== 'manual') {
+        // 如果有选中的真实节点，用 file key + node id 生成链接
+        if (state.fileKey) {
+          state.selection.figmaUrl = buildNodeUrl(state.fileKey, state.selection.id);
+        } else {
+          state.selection.figmaUrl = url;
+        }
+        updateSelection(state.selection);
+      } else {
+        // 没有选中节点，使用用户输入的完整链接
+        state.selection = {
+          hasSelection: true,
+          id: 'manual',
+          name: '手动输入的链接',
+          type: 'URL',
+          figmaUrl: url
+        };
+        updateSelection(state.selection);
+      }
+      
+      // 保存状态到 localStorage
+      saveState();
+    };
+
+    // 初始化
+    loadSavedState(); // 恢复上次保存的状态
+    checkServer();
+  </script>
+</body>
+</html>

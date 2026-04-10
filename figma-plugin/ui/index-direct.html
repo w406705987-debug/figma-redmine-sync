@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>Figma-易协作同步工具 (直连版)</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; font-size: 12px; padding: 12px; background: #fff; }
+    
+    .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #e5e5e5; margin-bottom: 12px; }
+    .header h1 { font-size: 14px; }
+    .status { font-size: 11px; color: #666; }
+    .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+    .status-dot.online { background: #22c55e; }
+    .status-dot.offline { background: #ef4444; }
+    
+    .section { background: #f7f7f7; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+    .section-title { font-size: 12px; font-weight: bold; margin-bottom: 8px; }
+    
+    .config-area { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+    .config-area h3 { font-size: 12px; color: #92400e; margin-bottom: 8px; }
+    .config-area textarea { width: 100%; height: 60px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 10px; font-family: monospace; resize: none; }
+    .config-area .hint { font-size: 10px; color: #666; margin-top: 6px; }
+    
+    .btn { padding: 8px 12px; border: none; border-radius: 6px; font-size: 11px; cursor: pointer; }
+    .btn-small { padding: 6px 10px; }
+    .btn-primary { background: #0066ff; color: white; }
+    .btn-warning { background: #f59e0b; color: white; }
+    .btn-secondary { background: #e5e5e5; color: #333; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    .issue-status { font-size: 9px; padding: 2px 4px; border-radius: 3px; background: #e5e5e5; color: #666; margin-left: 4px; white-space: nowrap; }
+    .issue-status.status-新建 { background: #dbeafe; color: #1d4ed8; }
+    .issue-status.status-UI设计中 { background: #fef3c7; color: #d97706; }
+    .issue-status.status-策划审核中 { background: #fce7f3; color: #be185d; }
+    .issue-status.status-跟进验收联调 { background: #d1fae5; color: #059669; }
+    
+    .filter-box { margin-bottom: 8px; }
+    .filter-box select { width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; background: white; }
+    
+    .issue-list { max-height: 150px; overflow-y: auto; }
+    .issue-item { display: flex; align-items: center; gap: 8px; padding: 8px; background: white; border-radius: 6px; margin-bottom: 4px; cursor: pointer; border: 2px solid transparent; }
+    .issue-item:hover { background: #f0f7ff; }
+    .issue-item.selected { border-color: #0066ff; background: #f0f7ff; }
+    .issue-id { color: #0066ff; font-weight: bold; }
+    .issue-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    
+    .selection-info { background: white; padding: 10px; border-radius: 6px; }
+    .node-name { font-weight: bold; margin-bottom: 4px; }
+    .node-type { font-size: 10px; background: #e5e5e5; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 4px; }
+    .node-url { font-size: 10px; color: #0066ff; word-break: break-all; }
+    
+    .actions { display: flex; gap: 8px; margin-bottom: 8px; }
+    .actions .btn { flex: 1; }
+    
+    .empty { text-align: center; color: #999; padding: 16px; }
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 8px; display: none; z-index: 1000; }
+    .toast.show { display: block; }
+    .toast.success { background: #22c55e; }
+    .toast.error { background: #ef4444; }
+    
+    .loading { text-align: center; padding: 20px; color: #666; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📋 Figma-易协作同步 (直连版)</h1>
+    <span class="status" id="connectionStatus">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">检测中...</span>
+    </span>
+  </div>
+
+  <!-- Cookie 配置区 -->
+  <div class="config-area" id="configArea">
+    <h3>🔑 首次使用请配置认证信息</h3>
+    <p style="font-size: 11px; margin-bottom: 8px;">
+      1. 登录 <a href="https://x20.pm.netease.com" target="_blank">x20.pm.netease.com</a><br>
+      2. 按 F12 → Application → Cookies → 复制 <b>_my_redmine</b> 的值
+    </p>
+    <textarea id="cookieInput" placeholder="粘贴 _my_redmine Cookie 值..."></textarea>
+    <div style="display: flex; gap: 8px; margin-top: 8px;">
+      <button class="btn btn-primary btn-small" id="saveCookieBtn">💾 保存并连接</button>
+      <button class="btn btn-secondary btn-small" id="testConnectionBtn">🧪 测试连接</button>
+    </div>
+    <div class="hint">Cookie 有效期约30天，过期后需重新获取</div>
+  </div>
+
+  <!-- 工单列表 -->
+  <div class="section">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <span class="section-title">我的工单 <span id="issueCount">(0个)</span></span>
+      <button class="btn btn-small btn-secondary" id="refreshBtn">🔄 刷新</button>
+    </div>
+    
+    <div class="filter-box">
+      <select id="statusFilter">
+        <option value="default">🎯 默认（新建/设计中/审核中）</option>
+        <option value="all">📋 全部状态</option>
+        <option value="新建">🆕 新建</option>
+        <option value="UI设计中">🎨 UI设计中</option>
+        <option value="策划审核中">📝 策划审核中</option>
+        <option value="跟进验收联调">✅ 跟进验收联调</option>
+      </select>
+    </div>
+    
+    <div class="issue-list" id="issueList">
+      <div class="empty">请先配置 Cookie</div>
+    </div>
+  </div>
+
+  <!-- 当前选择 -->
+  <div class="section">
+    <div class="section-title">当前选中节点</div>
+    <div class="selection-info" id="selectionInfo">
+      <div class="empty">请在画布中选择一个元素</div>
+    </div>
+  </div>
+
+  <!-- 操作按钮 -->
+  <div class="actions">
+    <button class="btn btn-primary" id="linkBtn" disabled>🔗 添加工单链接</button>
+    <button class="btn btn-warning" id="copyPopoBtn" disabled>📋 复制审核内容</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // 易协作 API 配置
+    var REDMINE_HOST = 'x20.pm.netease.com';
+    var PROJECT_ID = 7;  // X20-MARVEL
+    var STORAGE_KEY = 'figma-redmine-direct';
+    
+    var state = {
+      issues: [],
+      filteredIssues: [],
+      selectedIssue: null,
+      selection: null,
+      cookie: '',
+      fileKey: '',
+      baseFileUrl: ''
+    };
+
+    // ==================== Cookie 管理 ====================
+    
+    function loadCookie() {
+      try {
+        var saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          var data = JSON.parse(saved);
+          state.cookie = data.cookie || '';
+          state.fileKey = data.fileKey || '';
+          state.baseFileUrl = data.baseFileUrl || '';
+          return state.cookie;
+        }
+      } catch (e) {}
+      return '';
+    }
+
+    function saveCookie(cookie) {
+      state.cookie = cookie;
+      try {
+        var data = {
+          cookie: cookie,
+          fileKey: state.fileKey,
+          baseFileUrl: state.baseFileUrl
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (e) {}
+    }
+
+    // ==================== 易协作 API 调用 ====================
+    
+    function callRedmineApi(endpoint, options) {
+      options = options || {};
+      var url = 'https://' + REDMINE_HOST + endpoint;
+      
+      var fetchOptions = {
+        method: options.method || 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Cookie': '_my_redmine=' + state.cookie
+        }
+      };
+      
+      if (options.body) {
+        fetchOptions.body = JSON.stringify(options.body);
+      }
+      
+      return fetch(url, fetchOptions)
+        .then(function(response) {
+          return response.json();
+        })
+        .then(function(data) {
+          if (data.res_code === -1) {
+            throw new Error('Cookie 已过期，请重新获取');
+          }
+          return data;
+        });
+    }
+
+    function loadIssues() {
+      if (!state.cookie) {
+        document.getElementById('issueList').innerHTML = '<div class="empty">请先配置 Cookie</div>';
+        return;
+      }
+      
+      document.getElementById('issueList').innerHTML = '<div class="loading">加载中...</div>';
+      
+      var requestBody = {
+        project_id: PROJECT_ID,
+        set_filter: 1,
+        mode: 'preview',
+        filters: {
+          assigned_to_id: { operator: '=', values: ['me'] },
+          status_id: { operator: 'o', values: [] }
+        }
+      };
+      
+      callRedmineApi('/api/v6/issues', { body: requestBody })
+        .then(function(data) {
+          if (data.res_code === 1) {
+            var list = data.data.list || [];
+            state.issues = list.map(function(issue) {
+              var subject = typeof issue.subject === 'object' ? issue.subject.value : issue.subject;
+              var assignedTo = typeof issue.assigned_to === 'object' ? issue.assigned_to.value : '';
+              
+              return {
+                id: issue.id,
+                subject: subject || '工单 #' + issue.id,
+                status: issue.status || '未知',
+                priority: issue.priority || 'P2-普通',
+                tracker: issue.tracker || 'UI设计',
+                assignedTo: assignedTo,
+                startDate: issue.start_date || '',
+                dueDate: issue.due_date || ''
+              };
+            });
+            
+            document.getElementById('issueCount').textContent = '(' + state.issues.length + '个)';
+            setConnectionStatus(true, '已连接');
+            hideConfigArea();
+            filterIssues();
+          } else {
+            throw new Error(data.res_msg || '加载失败');
+          }
+        })
+        .catch(function(error) {
+          console.error('加载工单失败:', error);
+          document.getElementById('issueList').innerHTML = '<div class="empty">加载失败: ' + error.message + '</div>';
+          setConnectionStatus(false, '连接失败');
+          showConfigArea();
+        });
+    }
+
+    function testConnection() {
+      var cookie = document.getElementById('cookieInput').value.trim();
+      if (!cookie) {
+        showToast('请输入 Cookie', 'error');
+        return;
+      }
+      
+      state.cookie = cookie;
+      document.getElementById('testConnectionBtn').textContent = '测试中...';
+      document.getElementById('testConnectionBtn').disabled = true;
+      
+      var requestBody = {
+        project_id: PROJECT_ID,
+        set_filter: 1,
+        mode: 'preview',
+        per_page: 1,
+        filters: {
+          assigned_to_id: { operator: '=', values: ['me'] }
+        }
+      };
+      
+      callRedmineApi('/api/v6/issues', { body: requestBody })
+        .then(function(data) {
+          if (data.res_code === 1) {
+            showToast('✅ 连接成功！', 'success');
+            setConnectionStatus(true, '测试成功');
+          } else {
+            throw new Error(data.res_msg || '连接失败');
+          }
+        })
+        .catch(function(error) {
+          showToast('❌ ' + error.message, 'error');
+          setConnectionStatus(false, '连接失败');
+        })
+        .finally(function() {
+          document.getElementById('testConnectionBtn').textContent = '🧪 测试连接';
+          document.getElementById('testConnectionBtn').disabled = false;
+        });
+    }
+
+    // ==================== UI 相关 ====================
+    
+    function setConnectionStatus(online, text) {
+      var dot = document.getElementById('statusDot');
+      var statusText = document.getElementById('statusText');
+      
+      if (online) {
+        dot.className = 'status-dot online';
+      } else {
+        dot.className = 'status-dot offline';
+      }
+      statusText.textContent = text;
+    }
+
+    function showConfigArea() {
+      document.getElementById('configArea').style.display = 'block';
+      if (state.cookie) {
+        document.getElementById('cookieInput').value = state.cookie;
+      }
+    }
+
+    function hideConfigArea() {
+      document.getElementById('configArea').style.display = 'none';
+    }
+
+    function filterIssues() {
+      var filter = document.getElementById('statusFilter').value;
+      var defaultStatuses = ['新建', 'UI设计中', '策划审核中'];
+      
+      if (filter === 'all') {
+        state.filteredIssues = state.issues;
+      } else if (filter === 'default') {
+        state.filteredIssues = state.issues.filter(function(issue) {
+          return defaultStatuses.indexOf(issue.status) !== -1;
+        });
+      } else {
+        state.filteredIssues = state.issues.filter(function(issue) {
+          return issue.status === filter;
+        });
+      }
+      
+      renderIssues();
+    }
+
+    function renderIssues() {
+      var list = document.getElementById('issueList');
+      var issues = state.filteredIssues;
+      
+      if (issues.length === 0) {
+        if (state.issues.length === 0) {
+          list.innerHTML = '<div class="empty">暂无工单</div>';
+        } else {
+          list.innerHTML = '<div class="empty">当前筛选条件下无工单</div>';
+        }
+        return;
+      }
+      
+      var html = '';
+      for (var i = 0; i < issues.length; i++) {
+        var issue = issues[i];
+        var selected = state.selectedIssue && state.selectedIssue.id === issue.id ? 'selected' : '';
+        var statusClass = issue.status ? 'status-' + issue.status : '';
+        
+        html += '<div class="issue-item ' + selected + '" data-id="' + issue.id + '">';
+        html += '<input type="radio" name="issue" ' + (selected ? 'checked' : '') + '>';
+        html += '<span class="issue-id">#' + issue.id + '</span>';
+        html += '<span class="issue-title" title="' + issue.subject + '">' + issue.subject + '</span>';
+        if (issue.status) {
+          html += '<span class="issue-status ' + statusClass + '">' + issue.status + '</span>';
+        }
+        html += '</div>';
+      }
+      list.innerHTML = html;
+      bindIssueClicks();
+    }
+
+    function bindIssueClicks() {
+      var items = document.querySelectorAll('.issue-item');
+      for (var i = 0; i < items.length; i++) {
+        items[i].onclick = function() {
+          var id = parseInt(this.getAttribute('data-id'));
+          for (var j = 0; j < state.issues.length; j++) {
+            if (state.issues[j].id === id) {
+              state.selectedIssue = state.issues[j];
+              break;
+            }
+          }
+          renderIssues();
+          updateButtons();
+        };
+      }
+    }
+
+    function updateSelection(data) {
+      var info = document.getElementById('selectionInfo');
+      
+      if (!data || !data.hasSelection) {
+        info.innerHTML = '<div class="empty">请在画布中选择一个元素</div>';
+        state.selection = null;
+      } else {
+        state.selection = data;
+        info.innerHTML = 
+          '<div class="node-name">' + data.name + '</div>' +
+          '<div class="node-type">' + data.type + '</div>' +
+          '<div class="node-url">' + (data.figmaUrl || '需要先设置 Figma 文件 URL') + '</div>';
+      }
+      
+      updateButtons();
+    }
+
+    function updateButtons() {
+      var canLink = state.selectedIssue && state.selection && state.selection.hasSelection;
+      var canCopy = state.selectedIssue && state.selection && state.selection.figmaUrl;
+      
+      document.getElementById('linkBtn').disabled = !canLink;
+      document.getElementById('copyPopoBtn').disabled = !canCopy;
+    }
+
+    function showToast(message, type) {
+      var toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = 'toast show ' + (type || '');
+      
+      setTimeout(function() {
+        toast.className = 'toast';
+      }, 3000);
+    }
+
+    // ==================== 事件绑定 ====================
+    
+    document.getElementById('saveCookieBtn').onclick = function() {
+      var cookie = document.getElementById('cookieInput').value.trim();
+      if (!cookie) {
+        showToast('请输入 Cookie', 'error');
+        return;
+      }
+      
+      saveCookie(cookie);
+      showToast('✅ Cookie 已保存', 'success');
+      loadIssues();
+    };
+
+    document.getElementById('testConnectionBtn').onclick = testConnection;
+
+    document.getElementById('refreshBtn').onclick = function() {
+      loadIssues();
+    };
+
+    document.getElementById('statusFilter').onchange = filterIssues;
+
+    document.getElementById('linkBtn').onclick = function() {
+      if (!state.selectedIssue || !state.selection) return;
+      
+      var issueUrl = 'https://' + REDMINE_HOST + '/issues/' + state.selectedIssue.id;
+      
+      parent.postMessage({
+        pluginMessage: {
+          type: 'add-hyperlink',
+          url: issueUrl,
+          nodeName: state.selection.name
+        }
+      }, '*');
+      
+      showToast('✅ 已添加链接到工单 #' + state.selectedIssue.id, 'success');
+    };
+
+    document.getElementById('copyPopoBtn').onclick = function() {
+      if (!state.selectedIssue || !state.selection || !state.selection.figmaUrl) return;
+      
+      var content = '【交互稿审核】\n';
+      content += '工单: #' + state.selectedIssue.id + ' ' + state.selectedIssue.subject + '\n';
+      content += '链接: ' + state.selection.figmaUrl + '\n';
+      content += '状态: ' + state.selectedIssue.status;
+      
+      var textArea = document.createElement('textarea');
+      textArea.value = content;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.select();
+      
+      try {
+        document.execCommand('copy');
+        showToast('✅ 已复制审核内容', 'success');
+      } catch (e) {
+        showToast('复制失败', 'error');
+      }
+      
+      document.body.removeChild(textArea);
+    };
+
+    // Figma 消息监听
+    window.onmessage = function(event) {
+      var msg = event.data.pluginMessage;
+      if (!msg) return;
+      
+      if (msg.type === 'selection-change') {
+        updateSelection(msg);
+      }
+    };
+
+    // ==================== 初始化 ====================
+    
+    function init() {
+      var cookie = loadCookie();
+      
+      if (cookie) {
+        document.getElementById('cookieInput').value = cookie;
+        loadIssues();
+      } else {
+        showConfigArea();
+        setConnectionStatus(false, '未配置');
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,384 @@
+/* Figma 插件样式 */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 12px;
+  color: var(--figma-color-text, #333);
+  background: var(--figma-color-bg, #fff);
+  line-height: 1.4;
+}
+
+.container {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+/* 头部 */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--figma-color-border, #e5e5e5);
+}
+
+.header h1 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.server-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #666;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-dot.online {
+  background: #22c55e;
+}
+
+.status-dot.offline {
+  background: #ef4444;
+}
+
+/* 区块 */
+.section {
+  background: var(--figma-color-bg-secondary, #f7f7f7);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.section-header h2 {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 按钮 */
+.btn {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex: 1;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #0066ff;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #0052cc;
+}
+
+.btn-secondary {
+  background: #e5e5e5;
+  color: #333;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #d4d4d4;
+}
+
+.btn-success {
+  background: #22c55e;
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background: #16a34a;
+}
+
+.btn-warning {
+  background: #f59e0b;
+  color: white;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: #d97706;
+}
+
+.btn-icon {
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.btn-icon:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.btn-text {
+  background: transparent;
+  border: none;
+  color: #0066ff;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.btn-text:hover {
+  text-decoration: underline;
+}
+
+/* 添加工单输入框 */
+.add-issue-box {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.add-issue-box input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--figma-color-border, #e5e5e5);
+  border-radius: 6px;
+  font-size: 11px;
+  outline: none;
+}
+
+.add-issue-box input:focus {
+  border-color: #0066ff;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.issue-count {
+  font-size: 11px;
+  color: #666;
+}
+
+/* 搜索框 */
+.search-box {
+  margin-bottom: 8px;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--figma-color-border, #e5e5e5);
+  border-radius: 6px;
+  font-size: 11px;
+  outline: none;
+}
+
+.search-box input:focus {
+  border-color: #0066ff;
+}
+
+/* 工单列表 */
+.issue-list {
+  max-height: 150px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.issue-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.15s;
+}
+
+.issue-item:hover {
+  background: #f0f7ff;
+}
+
+.issue-item.selected {
+  border-color: #0066ff;
+  background: #f0f7ff;
+}
+
+.issue-item input[type="radio"] {
+  margin: 0;
+}
+
+.issue-id {
+  color: #0066ff;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.issue-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+/* 选中节点信息 */
+.selection-info {
+  background: white;
+  padding: 10px;
+  border-radius: 6px;
+}
+
+.selection-info .node-name {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.selection-info .node-type {
+  font-size: 10px;
+  color: #666;
+  background: #e5e5e5;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+  margin-bottom: 6px;
+}
+
+.selection-info .node-url {
+  font-size: 10px;
+  color: #0066ff;
+  word-break: break-all;
+}
+
+/* 操作按钮组 */
+.actions-section {
+  background: transparent;
+  padding: 0;
+}
+
+.action-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* 记录列表 */
+.record-list {
+  max-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.record-item {
+  background: white;
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.record-item .record-time {
+  color: #666;
+  font-size: 10px;
+}
+
+.record-item .record-issue {
+  font-weight: 500;
+}
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  color: #999;
+  padding: 16px;
+  font-size: 11px;
+}
+
+.loading {
+  text-align: center;
+  color: #666;
+  padding: 16px;
+}
+
+/* Toast 通知 */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: #333;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 12px;
+  opacity: 0;
+  transition: all 0.3s;
+  z-index: 1000;
+}
+
+.toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.toast.success {
+  background: #22c55e;
+}
+
+.toast.error {
+  background: #ef4444;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #999;
+}
