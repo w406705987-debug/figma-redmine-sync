@@ -176,6 +176,15 @@
     .figma-link-actions .icon-btn-mini.delete:hover { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
     .figma-link-actions .icon-btn-mini svg { width: 14px; height: 14px; }
     
+    /* 工单操作图标按钮 */
+    .issue-actions { display: flex; align-items: center; gap: 4px; }
+    .issue-actions .icon-btn-mini { width: 28px; height: 28px; border: none; background: var(--bg-tertiary); color: var(--text-secondary); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .issue-actions .icon-btn-mini:hover { background: rgba(183, 63, 108, 0.15); color: var(--accent); }
+    .issue-actions .icon-btn-mini.delete:hover { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .issue-actions .icon-btn-mini:disabled { opacity: 0.3; cursor: not-allowed; }
+    .issue-actions .icon-btn-mini:disabled:hover { background: var(--bg-tertiary); color: var(--text-secondary); }
+    .issue-actions .icon-btn-mini svg { width: 14px; height: 14px; }
+    
     /* 操作按钮组 */
     .actions { display: flex; gap: 8px; margin-bottom: 8px; }
     .actions .btn { flex: 1; }
@@ -407,8 +416,15 @@
     <div class="add-box">
       <input type="text" id="issueInput" placeholder="输入工单号，如 447596 或批量：447596,445301">
       <button class="btn btn-small btn-primary" id="addBtn">添加</button>
-      <button class="btn btn-small btn-secondary" id="copyIssueIdBtn" disabled title="复制选中的工单号">复制</button>
-      <button class="btn btn-small btn-secondary" id="deleteBtn" disabled title="选中工单后可删除">删除</button>
+      <button class="btn btn-small btn-secondary" id="gotoIssueBtn" disabled title="打开选中的工单页面">前往</button>
+      <div class="issue-actions">
+        <button class="icon-btn-mini" id="copyIssueIdBtn" disabled title="复制工单链接">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        </button>
+        <button class="icon-btn-mini delete" id="deleteBtn" disabled title="删除工单">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
+      </div>
     </div>
     <div class="issue-list" id="issueList">
       <div class="empty">加载中...</div>
@@ -1337,6 +1353,8 @@
       
       // 复制工单号按钮：需要选中工单
       document.getElementById('copyIssueIdBtn').disabled = !hasIssue;
+      // 前往按钮：需要选中工单
+      document.getElementById('gotoIssueBtn').disabled = !hasIssue;
       // 删除按钮：需要选中工单
       document.getElementById('deleteBtn').disabled = !hasIssue;
       // 关联按钮：需要选中工单 + 选中真实节点（非手动输入）
@@ -1399,15 +1417,20 @@
         });
     };
 
-    // 复制工单号
+    // 复制工单链接（格式：#工单号 标题 + 链接）
     document.getElementById('copyIssueIdBtn').onclick = function() {
       if (!state.selectedIssue) return;
       
-      var issueId = '#' + state.selectedIssue.id;
+      var issueId = state.selectedIssue.id;
+      var issueTitle = state.selectedIssue.subject || '';
+      var issueUrl = 'https://x20.pm.netease.com/issues/' + issueId;
+      
+      // 格式：#工单号 标题\n链接
+      var copyContent = '#' + issueId + ' ' + issueTitle + '\n' + issueUrl;
       
       // 复制到剪贴板
       var textArea = document.createElement('textarea');
-      textArea.value = issueId;
+      textArea.value = copyContent;
       textArea.style.position = 'fixed';
       textArea.style.left = '-9999px';
       document.body.appendChild(textArea);
@@ -1415,7 +1438,18 @@
       document.execCommand('copy');
       document.body.removeChild(textArea);
       
-      showToast('✅ 已复制: ' + issueId, 'success');
+      showToast('✅ 已复制工单链接', 'success');
+    };
+
+    // 前往工单页面
+    document.getElementById('gotoIssueBtn').onclick = function() {
+      if (!state.selectedIssue) return;
+      
+      var issueId = state.selectedIssue.id;
+      var issueUrl = 'https://x20.pm.netease.com/issues/' + issueId;
+      
+      // 在新标签页打开工单链接
+      window.open(issueUrl, '_blank');
     };
 
     // 删除工单

@@ -62,32 +62,37 @@ function getCurrentFileUrl() {
   return buildFileUrl(null);
 }
 
-// 给节点添加超链接
-function setNodeHyperlink(nodeId, url) {
-  var node = figma.getNodeById(nodeId);
-  
-  if (!node) {
-    return { success: false, error: '找不到指定节点' };
-  }
+// 给节点添加超链接（异步版本）
+async function setNodeHyperlink(nodeId, url) {
+  try {
+    var node = await figma.getNodeByIdAsync(nodeId);
+    
+    if (!node) {
+      return { success: false, error: '找不到指定节点' };
+    }
 
-  if ('hyperlink' in node) {
-    node.hyperlink = { type: 'URL', value: url };
-    return { success: true, message: '超链接已添加' };
-  } else {
-    return { success: false, error: '该节点类型不支持超链接' };
+    if ('hyperlink' in node) {
+      node.hyperlink = { type: 'URL', value: url };
+      return { success: true, message: '超链接已添加', nodeName: node.name };
+    } else {
+      return { success: false, error: '该节点类型不支持超链接' };
+    }
+  } catch (e) {
+    console.log('setNodeHyperlink error:', e);
+    return { success: false, error: e.message || '设置超链接失败' };
   }
 }
 
-// 根据 nodeId 获取节点所在的页面名称
-function getPageInfoByNodeId(nodeId) {
+// 根据 nodeId 获取节点所在的页面名称（异步版本）
+async function getPageInfoByNodeId(nodeId) {
   // nodeId 格式通常是 "pageId:nodeId" 或直接 "nodeId"
   // 先尝试解析，看是否能找到对应页面
   var pageName = figma.currentPage.name; // 默认使用当前页面名
   var nodeName = '';
   
   try {
-    // 尝试直接获取节点
-    var node = figma.getNodeById(nodeId);
+    // 尝试直接获取节点（使用异步方法）
+    var node = await figma.getNodeByIdAsync(nodeId);
     if (node) {
       nodeName = node.name;
       // 向上查找直到找到 PageNode
@@ -136,14 +141,17 @@ figma.ui.onmessage = function(msg) {
   }
   
   else if (msg.type === 'set-hyperlink') {
-    result = setNodeHyperlink(msg.nodeId, msg.url);
-    figma.ui.postMessage({ type: 'hyperlink-result', data: result });
-    
-    if (result.success) {
-      var targetNode = figma.getNodeById(msg.nodeId);
-      nodeName = targetNode ? targetNode.name : '节点';
-      figma.notify('已为 "' + nodeName + '" 添加易协作链接');
-    }
+    setNodeHyperlink(msg.nodeId, msg.url).then(function(result) {
+      figma.ui.postMessage({ type: 'hyperlink-result', data: result });
+      
+      if (result.success) {
+        var nodeName = result.nodeName || '节点';
+        figma.notify('已为 "' + nodeName + '" 添加易协作链接');
+      }
+    }).catch(function(e) {
+      console.log('set-hyperlink error:', e);
+      figma.ui.postMessage({ type: 'hyperlink-result', data: { success: false, error: e.message || '设置超链接失败' } });
+    });
   }
   
   else if (msg.type === 'open-url') {
@@ -183,15 +191,26 @@ figma.ui.onmessage = function(msg) {
   }
   
   else if (msg.type === 'get-page-info') {
-    // 根据 nodeId 获取节点所在的页面名称
-    var pageInfo = getPageInfoByNodeId(msg.nodeId);
-    figma.ui.postMessage({ 
-      type: 'page-info-result', 
-      data: {
-        linkIndex: msg.linkIndex,
-        pageName: pageInfo.pageName,
-        nodeName: pageInfo.nodeName
-      }
+    // 根据 nodeId 获取节点所在的页面名称（异步）
+    getPageInfoByNodeId(msg.nodeId).then(function(pageInfo) {
+      figma.ui.postMessage({ 
+        type: 'page-info-result', 
+        data: {
+          linkIndex: msg.linkIndex,
+          pageName: pageInfo.pageName,
+          nodeName: pageInfo.nodeName
+        }
+      });
+    }).catch(function(e) {
+      console.log('get-page-info error:', e);
+      figma.ui.postMessage({ 
+        type: 'page-info-result', 
+        data: {
+          linkIndex: msg.linkIndex,
+          pageName: figma.currentPage.name,
+          nodeName: ''
+        }
+      });
     });
   }
   
