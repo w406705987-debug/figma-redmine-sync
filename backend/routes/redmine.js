@@ -337,4 +337,66 @@ router.get('/config', (req, res) => {
   }
 });
 
+// ==================== 需求记录 API ====================
+
+/**
+ * GET /api/redmine/records
+ * 获取所有需求记录
+ */
+router.get('/records', (req, res) => {
+  try {
+    const records = recordService.getAllRecords();
+    res.json({ success: true, records });
+  } catch (error) {
+    console.error('获取记录失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * POST /api/redmine/records
+ * 添加需求记录
+ */
+router.post('/records', (req, res) => {
+  try {
+    const { issueId, issueTitle, issueUrl, figmaUrl, figmaTitle } = req.body;
+    
+    if (!issueId || !figmaUrl) {
+      return res.status(400).json({ 
+        success: false, 
+        error: '缺少必要参数：issueId 或 figmaUrl' 
+      });
+    }
+    
+    const record = recordService.addRecord({
+      issueId,
+      issueTitle: issueTitle || '',
+      issueUrl: issueUrl || `https://x20.pm.netease.com/issues/${issueId}`,
+      figmaUrl,
+      figmaTitle: figmaTitle || '',
+      action: 'copy_review_content'
+    });
+    
+    res.json({ success: true, record });
+  } catch (error) {
+    console.error('添加记录失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/redmine/records/:id
+ * 删除指定记录
+ */
+router.delete('/records/:id', (req, res) => {
+  try {
+    const recordId = parseInt(req.params.id);
+    const result = recordService.deleteRecord(recordId);
+    res.json(result);
+  } catch (error) {
+    console.error('删除记录失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;

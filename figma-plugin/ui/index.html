@@ -217,6 +217,32 @@
     
     /* 布局容器 */
     .main-container { flex: 1; display: flex; flex-direction: column; }
+    
+    /* 页签样式 */
+    .tab-container { display: flex; gap: 0; margin-bottom: 12px; border-bottom: 1px solid var(--border); }
+    .tab-btn { flex: 1; padding: 10px 16px; border: none; background: transparent; color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+    .tab-btn:hover { color: var(--text-primary); background: rgba(183, 63, 108, 0.05); }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-content { display: none; flex: 1; flex-direction: column; }
+    .tab-content.active { display: flex; }
+    
+    /* 需求记录样式 */
+    .record-list-container { flex: 1; overflow-y: auto; max-height: 500px; }
+    .record-item-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 8px; position: relative; }
+    .record-item-card:hover { border-color: var(--accent); }
+    .record-date { font-size: 10px; color: var(--text-secondary); margin-bottom: 8px; display: flex; align-items: center; gap: 4px; }
+    .record-date::before { content: '📅'; }
+    .record-links { display: flex; flex-direction: column; gap: 6px; }
+    .record-link { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+    .record-link a { color: var(--accent); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }
+    .record-link a:hover { text-decoration: underline; }
+    .record-link .link-icon { flex-shrink: 0; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+    .record-delete-btn { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border: none; background: transparent; color: var(--text-secondary); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: all 0.15s; }
+    .record-item-card:hover .record-delete-btn { opacity: 0.6; }
+    .record-delete-btn:hover { opacity: 1 !important; background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .record-delete-btn svg { width: 12px; height: 12px; }
+    .record-empty { text-align: center; color: var(--text-secondary); padding: 40px 20px; font-size: 12px; }
+    .record-empty::before { content: '📝'; display: block; font-size: 32px; margin-bottom: 12px; opacity: 0.5; }
   </style>
 </head>
 <body>
@@ -363,6 +389,15 @@
   <!-- 主功能区域（配置完成后显示） -->
   <div id="mainFunctionArea" style="display:none;">
 
+  <!-- 页签切换 -->
+  <div class="tab-container">
+    <button class="tab-btn active" data-tab="main" id="tabMain">多方关联</button>
+    <button class="tab-btn" data-tab="records" id="tabRecords">需求记录</button>
+  </div>
+
+  <!-- 页签内容：多方关联（主功能） -->
+  <div class="tab-content active" id="tabContentMain">
+
   <div class="section">
     <div class="section-title-main">
       <div class="title-left">
@@ -469,6 +504,34 @@
       <button class="btn btn-warning btn-full btn-with-tooltip" id="copyPopoBtn" disabled data-tooltip="复制审核内容到剪贴板">📋 复制审核内容</button>
     </div>
   </div>
+
+  </div><!-- end tabContentMain -->
+
+  <!-- 页签内容：需求记录 -->
+  <div class="tab-content" id="tabContentRecords">
+    <div class="section" style="flex:1;">
+      <div class="section-title-main" style="border-bottom:none; margin-bottom:12px;">
+        <div class="title-left">
+          <span class="title-icon">📝</span>
+          <span class="title-text">需求记录</span>
+          <span class="issue-count-badge" id="recordCount">0</span>
+        </div>
+        <div class="title-actions">
+          <button class="icon-btn" id="refreshRecordsBtn" title="刷新记录">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <p style="font-size:10px; color:var(--text-secondary); margin:-8px 0 12px; padding:0 4px;">点击「复制审核内容」时自动记录，最多保留50条</p>
+      <div class="record-list-container" id="recordList">
+        <div class="record-empty">暂无记录<br>复制审核内容后将自动保存</div>
+      </div>
+    </div>
+  </div><!-- end tabContentRecords -->
   
   </div><!-- end mainFunctionArea -->
   </div><!-- end main-container -->
@@ -1381,11 +1444,168 @@
       try {
         document.execCommand('copy');
         showToast('✅ 已复制到剪贴板，可手动粘贴到POPO', 'success');
+        
+        // 保存需求记录
+        saveReviewRecord();
       } catch (e) {
         showToast('复制失败', 'error');
       }
       
       document.body.removeChild(textArea);
+    };
+    
+    // 保存需求记录（复制审核内容时调用）
+    function saveReviewRecord() {
+      if (!state.selectedIssue) return;
+      
+      // 获取 Figma 链接信息
+      var figmaUrl = '';
+      var figmaTitle = '';
+      
+      if (state.selectedFigmaLink) {
+        figmaUrl = state.selectedFigmaLink.url || '';
+        figmaTitle = state.selectedFigmaLink.docName || state.fileName || '';
+      } else if (state.selection && state.selection.figmaUrl) {
+        figmaUrl = state.selection.figmaUrl;
+        figmaTitle = state.selection.name || state.fileName || '';
+      }
+      
+      if (!figmaUrl) return; // 没有 Figma 链接则不记录
+      
+      var recordData = {
+        issueId: state.selectedIssue.id,
+        issueTitle: state.selectedIssue.subject || '',
+        issueUrl: 'https://x20.pm.netease.com/issues/' + state.selectedIssue.id,
+        figmaUrl: figmaUrl,
+        figmaTitle: figmaTitle
+      };
+      
+      fetch(API + '/api/redmine/records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(recordData)
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.success) {
+          console.log('需求记录已保存:', d.record);
+          // 如果当前在记录页签，刷新列表
+          if (document.getElementById('tabContentRecords').classList.contains('active')) {
+            loadRecords();
+          }
+        }
+      })
+      .catch(function(e) {
+        console.error('保存记录失败:', e);
+      });
+    }
+
+    // ==================== 页签切换逻辑 ====================
+    document.getElementById('tabMain').onclick = function() { switchTab('main'); };
+    document.getElementById('tabRecords').onclick = function() { switchTab('records'); loadRecords(); };
+    
+    function switchTab(tabName) {
+      // 切换按钮状态
+      document.querySelectorAll('.tab-btn').forEach(function(btn) {
+        btn.classList.remove('active');
+      });
+      document.querySelector('.tab-btn[data-tab="' + tabName + '"]').classList.add('active');
+      
+      // 切换内容区域
+      document.querySelectorAll('.tab-content').forEach(function(content) {
+        content.classList.remove('active');
+      });
+      document.getElementById('tabContent' + (tabName === 'main' ? 'Main' : 'Records')).classList.add('active');
+    }
+    
+    // ==================== 需求记录功能 ====================
+    function loadRecords() {
+      fetch(API + '/api/redmine/records')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+          if (d.success) {
+            renderRecords(d.records);
+          }
+        })
+        .catch(function(e) {
+          console.error('加载记录失败:', e);
+        });
+    }
+    
+    function renderRecords(records) {
+      var container = document.getElementById('recordList');
+      var countBadge = document.getElementById('recordCount');
+      
+      countBadge.textContent = records.length;
+      
+      if (!records || records.length === 0) {
+        container.innerHTML = '<div class="record-empty">暂无记录<br>复制审核内容后将自动保存</div>';
+        return;
+      }
+      
+      var html = '';
+      var deleteIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+      
+      records.forEach(function(record) {
+        html += '<div class="record-item-card" data-id="' + record.id + '">';
+        html += '<button class="record-delete-btn" title="删除记录">' + deleteIcon + '</button>';
+        html += '<div class="record-date">【' + record.date + '】' + (record.time || '') + '</div>';
+        html += '<div class="record-links">';
+        
+        // 工单链接
+        var issueText = '#' + record.issueId + ' ' + (record.issueTitle || '');
+        html += '<div class="record-link">';
+        html += '<span class="link-icon">📋</span>';
+        html += '<a href="' + record.issueUrl + '" target="_blank" title="' + issueText + '">' + issueText + '</a>';
+        html += '</div>';
+        
+        // Figma 链接
+        var figmaText = record.figmaTitle || 'Figma 设计稿';
+        html += '<div class="record-link">';
+        html += '<span class="link-icon">🎨</span>';
+        html += '<a href="' + record.figmaUrl + '" target="_blank" title="' + figmaText + '">' + figmaText + '</a>';
+        html += '</div>';
+        
+        html += '</div>';
+        html += '</div>';
+      });
+      
+      container.innerHTML = html;
+      bindRecordDeleteBtns();
+    }
+    
+    function bindRecordDeleteBtns() {
+      document.querySelectorAll('.record-delete-btn').forEach(function(btn) {
+        btn.onclick = function(e) {
+          e.stopPropagation();
+          var card = this.closest('.record-item-card');
+          var recordId = card.getAttribute('data-id');
+          
+          if (confirm('确定要删除这条记录吗？')) {
+            fetch(API + '/api/redmine/records/' + recordId, { method: 'DELETE' })
+              .then(function(r) { return r.json(); })
+              .then(function(d) {
+                if (d.success) {
+                  showToast('✅ 记录已删除', 'success');
+                  loadRecords();
+                } else {
+                  showToast('删除失败', 'error');
+                }
+              })
+              .catch(function(e) {
+                showToast('删除失败: ' + e.message, 'error');
+              });
+          }
+        };
+      });
+    }
+    
+    // 刷新记录按钮
+    document.getElementById('refreshRecordsBtn').onclick = function() {
+      var btn = this;
+      btn.classList.add('refreshing');
+      loadRecords();
+      setTimeout(function() { btn.classList.remove('refreshing'); }, 500);
     };
 
     // 刷新工单列表（从易协作重新同步）

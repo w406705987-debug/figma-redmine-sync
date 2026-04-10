@@ -54,6 +54,12 @@ class RecordService {
         ...record
       };
       data.records.unshift(newRecord); // 最新的在前面
+      
+      // 限制最多保留50条记录
+      if (data.records.length > 50) {
+        data.records = data.records.slice(0, 50);
+      }
+      
       fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
       return newRecord;
     } catch (error) {
