@@ -296,15 +296,15 @@
           </div>
           <div class="step">
             <span class="step-num">3</span>
-            <span style="font-size:11px;">点击 <code>Application</code> 标签页</span>
+            <span style="font-size:11px;">点击 <code>Application</code> 标签页（在顶部更多页签中可打开）</span>
           </div>
           <div class="step">
             <span class="step-num">4</span>
-            <span style="font-size:11px;">左侧 Cookies → <code>x20.pm.netease.com</code></span>
+            <span style="font-size:11px;">选择左侧 Cookies 下的项目地址（例如：<code>https://x20.pm.netease.com</code>）</span>
           </div>
           <div class="step">
             <span class="step-num">5</span>
-            <span style="font-size:11px;">找到 <code>_my_redmine</code>，双击复制 Value</span>
+            <span style="font-size:11px;">找到 name 列的 <code>_my_redmine</code>，并复制其 Value</span>
           </div>
         </div>
         <div style="margin-top:12px;">
@@ -747,28 +747,32 @@
 
     // 显示 Cookie 配置区域
     function showLoginArea() {
-      document.getElementById('loginArea').style.display = 'block';
-      document.getElementById('loggedInArea').style.display = 'none';
+      var loginArea = document.getElementById('loginArea');
+      if (loginArea) loginArea.style.display = 'block';
       // 更新顶部配置状态
       var configStatus = document.getElementById('configStatus');
-      configStatus.className = 'config-status not-configured';
-      configStatus.innerHTML = '<span>未配置</span>';
+      if (configStatus) {
+        configStatus.className = 'config-status not-configured';
+        configStatus.innerHTML = '<span>未配置</span>';
+      }
     }
 
     // 显示已配置状态
     function showLoggedInState() {
-      document.getElementById('loginArea').style.display = 'none';
-      document.getElementById('loggedInArea').style.display = 'none';
+      var loginArea = document.getElementById('loginArea');
+      if (loginArea) loginArea.style.display = 'none';
       // 更新顶部配置状态
       var configStatus = document.getElementById('configStatus');
-      configStatus.className = 'config-status';
-      configStatus.innerHTML = '<span>✓ 已配置</span>';
+      if (configStatus) {
+        configStatus.className = 'config-status';
+        configStatus.innerHTML = '<span>✓ 已配置</span>';
+      }
     }
 
     // 隐藏所有认证相关区域
     function hideLoginAreas() {
-      document.getElementById('loginArea').style.display = 'none';
-      document.getElementById('loggedInArea').style.display = 'none';
+      var loginArea = document.getElementById('loginArea');
+      if (loginArea) loginArea.style.display = 'none';
     }
 
     // ==================== 引导流程按钮事件 ====================
@@ -1131,7 +1135,7 @@
           
           state.issues = d.issues || [];
           console.log('工单数量:', state.issues.length);
-          document.getElementById('issueCount').textContent = '(' + state.issues.length + '个)';
+          document.getElementById('issueCount').textContent = state.issues.length;
           
           try {
             filterIssues(); // 应用当前筛选条件
