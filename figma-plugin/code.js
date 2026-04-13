@@ -190,6 +190,31 @@ figma.ui.onmessage = function(msg) {
     });
   }
   
+  else if (msg.type === 'save-filter-state') {
+    // 保存筛选状态
+    figma.clientStorage.setAsync('filter-state', msg.filters).then(function() {
+      console.log('筛选状态已保存:', msg.filters);
+    }).catch(function(e) {
+      console.log('筛选状态保存失败:', e);
+    });
+  }
+  
+  else if (msg.type === 'get-filter-state') {
+    // 加载筛选状态
+    figma.clientStorage.getAsync('filter-state').then(function(filters) {
+      figma.ui.postMessage({ 
+        type: 'filter-state-loaded', 
+        data: { filters: filters || ['default'] }
+      });
+    }).catch(function(e) {
+      console.log('筛选状态加载失败:', e);
+      figma.ui.postMessage({ 
+        type: 'filter-state-loaded', 
+        data: { filters: ['default'] }
+      });
+    });
+  }
+  
   else if (msg.type === 'get-page-info') {
     // 根据 nodeId 获取节点所在的页面名称（异步）
     getPageInfoByNodeId(msg.nodeId).then(function(pageInfo) {

@@ -438,25 +438,25 @@
     <div class="filter-panel" id="filterPanel" style="display:none;">
       <div class="filter-options" id="filterOptions">
         <label class="filter-chip active" data-value="default">
-          <input type="radio" name="statusFilter" value="default" checked> 默认
+          <input type="checkbox" class="status-filter-cb" value="default" checked> 默认
         </label>
         <label class="filter-chip" data-value="all">
-          <input type="radio" name="statusFilter" value="all"> 全部
+          <input type="checkbox" class="status-filter-cb" value="all"> 全部
         </label>
         <label class="filter-chip" data-value="新建">
-          <input type="radio" name="statusFilter" value="新建"> 新建
+          <input type="checkbox" class="status-filter-cb" value="新建"> 新建
         </label>
         <label class="filter-chip" data-value="UI设计中">
-          <input type="radio" name="statusFilter" value="UI设计中"> UI设计中
+          <input type="checkbox" class="status-filter-cb" value="UI设计中"> UI设计中
         </label>
         <label class="filter-chip" data-value="策划审核中">
-          <input type="radio" name="statusFilter" value="策划审核中"> 策划审核中
+          <input type="checkbox" class="status-filter-cb" value="策划审核中"> 策划审核中
         </label>
         <label class="filter-chip" data-value="跟进验收联调">
-          <input type="radio" name="statusFilter" value="跟进验收联调"> 跟进验收联调
+          <input type="checkbox" class="status-filter-cb" value="跟进验收联调"> 跟进验收联调
         </label>
         <label class="filter-chip" data-value="已关闭">
-          <input type="radio" name="statusFilter" value="已关闭"> 已关闭
+          <input type="checkbox" class="status-filter-cb" value="已关闭"> 已关闭
         </label>
       </div>
     </div>
@@ -1255,7 +1255,7 @@
           document.getElementById('issueCount').textContent = state.issues.length;
           
           try {
-            filterIssues(); // 应用当前筛选条件
+            filterIssues(); // 应用当前筛选条件（筛选状态已在页面初始化时恢复）
           } catch (filterError) {
             console.error('筛选工单出错:', filterError);
             // 直接渲染所有工单
@@ -1269,27 +1269,42 @@
         });
     }
 
-    // 筛选工单
+    // 筛选工单（支持多选）
     function filterIssues() {
-      // 从 radio button 获取选中的值
-      var filterRadio = document.querySelector('input[name="statusFilter"]:checked');
-      var filter = filterRadio ? filterRadio.value : 'default';
+      // 获取所有选中的checkbox
+      var checked = document.querySelectorAll('.status-filter-cb:checked');
+      var filters = [];
+      for (var i = 0; i < checked.length; i++) {
+        filters.push(checked[i].value);
+      }
       
-      // 需要排除的状态（默认筛选时不显示这些状态）
+      // 保存筛选状态到 Figma clientStorage
+      parent.postMessage({
+        pluginMessage: {
+          type: 'save-filter-state',
+          filters: filters
+        }
+      }, '*');
+      
       var excludeStatuses = ['已关闭', '关闭', 'Closed', '跟进验收联调', '开发中'];
       
-      if (filter === 'all') {
-        state.filteredIssues = state.issues;
-      } else if (filter === 'default') {
-        // 默认 = 排除"已关闭"、"跟进验收联调"、"开发中"
+      if (filters.length === 0) {
+        // 无选择 = 默认
         state.filteredIssues = state.issues.filter(function(issue) {
-          var status = issue.status || '';
-          return excludeStatuses.indexOf(status) === -1;
+          return excludeStatuses.indexOf(issue.status || '') === -1;
+        });
+      } else if (filters.indexOf('all') > -1) {
+        // 有"全部" = 显示所有
+        state.filteredIssues = state.issues;
+      } else if (filters.indexOf('default') > -1 && filters.length === 1) {
+        // 仅"默认"
+        state.filteredIssues = state.issues.filter(function(issue) {
+          return excludeStatuses.indexOf(issue.status || '') === -1;
         });
       } else {
-        // 按指定状态筛选
+        // 多选：显示选中的状态
         state.filteredIssues = state.issues.filter(function(issue) {
-          return issue.status === filter;
+          return filters.indexOf(issue.status) > -1;
         });
       }
       
@@ -2244,18 +2259,15 @@
       }
     };
 
-    // 筛选选项点击事件
-    document.querySelectorAll('.filter-chip').forEach(function(chip) {
-      chip.onclick = function() {
-        // 移除所有 active 状态
-        document.querySelectorAll('.filter-chip').forEach(function(c) {
-          c.classList.remove('active');
-        });
-        // 添加当前 active 状态
-        this.classList.add('active');
-        // 选中对应的 radio
-        this.querySelector('input').checked = true;
-        // 触发筛选
+    // 筛选选项点击事件（多选checkbox）
+    document.querySelectorAll('.status-filter-cb').forEach(function(cb) {
+      cb.onchange = function() {
+        var label = this.parentNode;
+        if (this.checked) {
+          label.classList.add('active');
+        } else {
+          label.classList.remove('active');
+        }
         filterIssues();
       };
     });
@@ -2420,6 +2432,11 @@
       } else if (msg.type === 'storage-loaded') {
         // 从 Figma clientStorage 加载的数据
         applySavedState(msg.data);
+      } else if (msg.type === 'filter-state-loaded') {
+        // 恢复筛选状态
+        if (msg.data && msg.data.filters) {
+          restoreFilterState(msg.data.filters);
+        }
       } else if (msg.type === 'page-info-result') {
         // 更新链接的页面名称
         if (msg.data.linkIndex !== undefined && state.figmaLinks[msg.data.linkIndex]) {
@@ -2471,8 +2488,30 @@
       }
     };
 
+    // 恢复筛选状态（从 Figma clientStorage）
+    function restoreFilterState(filters) {
+      if (!filters || filters.length === 0) return;
+      
+      console.log('恢复筛选状态:', filters);
+      document.querySelectorAll('.status-filter-cb').forEach(function(cb) {
+        if (filters.indexOf(cb.value) > -1) {
+          cb.checked = true;
+          cb.parentNode.classList.add('active');
+        } else {
+          cb.checked = false;
+          cb.parentNode.classList.remove('active');
+        }
+      });
+    }
+
     // 初始化
     loadSavedState(); // 恢复上次保存的状态
+    
+    // 请求筛选状态（从 Figma clientStorage 异步获取）
+    parent.postMessage({
+      pluginMessage: { type: 'get-filter-state' }
+    }, '*');
+    
     checkServer();
   </script>
 </body>
