@@ -135,6 +135,28 @@ class RecordService {
       throw error;
     }
   }
+
+  /**
+   * 更新记录的截图数据
+   * @param {number} recordId - 记录ID
+   * @param {string} screenshotBase64 - 截图 Base64 数据
+   */
+  updateRecordScreenshot(recordId, screenshotBase64) {
+    try {
+      const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
+      const record = data.records.find(r => r.id === recordId);
+      if (record) {
+        record.screenshotBase64 = screenshotBase64;
+        record.screenshotSavedAt = new Date().toISOString();
+        fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+        return { success: true, record };
+      }
+      return { success: false, error: '记录不存在' };
+    } catch (error) {
+      console.error('更新记录截图失败:', error.message);
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 module.exports = new RecordService();

@@ -87,7 +87,7 @@ class FigmaService {
    * 获取文件/节点的截图 URL
    * @param {string} fileKey - Figma 文件 ID
    * @param {string} nodeId - 节点 ID（可选，不传则获取第一页）
-   * @param {object} options - 选项 { format: 'png'|'jpg'|'svg', scale: 1-4 }
+   * @param {object} options - 选项 { format: 'png'|'jpg'|'svg', scale: 0.5-4 }
    */
   async getImageUrl(fileKey, nodeId = null, options = {}) {
     const token = this.getToken();
@@ -95,8 +95,10 @@ class FigmaService {
       return { success: false, error: '请先配置 Figma Token', needToken: true };
     }
 
-    const format = options.format || 'png';
-    const scale = options.scale || 1;
+    // 使用 JPG 格式，文件更小，生成更快
+    const format = options.format || 'jpg';
+    // 使用极低分辨率加速生成（0.01 = 1%，最低限度）
+    const scale = options.scale || 0.01;
 
     try {
       let url = `${this.baseUrl}/images/${fileKey}`;
@@ -106,14 +108,14 @@ class FigmaService {
         params.ids = nodeId;
       }
 
-      console.log(`获取 Figma 截图: fileKey=${fileKey}, nodeId=${nodeId}`);
+      console.log(`获取 Figma 截图: fileKey=${fileKey}, nodeId=${nodeId}, scale=${scale}`);
 
       const response = await axios.get(url, {
         params,
         headers: {
           'X-Figma-Token': token
         },
-        timeout: 30000
+        timeout: 120000  // 增加到 2 分钟
       });
 
       if (response.data.err) {
@@ -137,6 +139,9 @@ class FigmaService {
       }
       if (e.response?.status === 404) {
         return { success: false, error: '文件不存在或无权访问' };
+      }
+      if (e.code === 'ECONNABORTED' || e.message.includes('timeout')) {
+        return { success: false, error: '截图生成超时，设计稿可能太大，请稍后重试' };
       }
       
       return { success: false, error: e.message };
@@ -195,6 +200,78 @@ class FigmaService {
       };
     } catch (e) {
       console.error('下载图片失败:', e.message);
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * 保存截图到本地文件
+   * @param {string} base64 - Base64 格式的图片数据
+   * @param {string} recordId - 记录ID（用于生成文件名）
+   */
+  saveScreenshotToFile(base64, recordId) {
+    try {
+      // 创建截图保存目录
+      const screenshotsDir = path.join(__dirname, '..', 'data', 'screenshots');
+      if (!fs.existsSync(screenshotsDir)) {
+        fs.mkdirSync(screenshotsDir, { recursive: true });
+      }
+
+      // 提取图片数据（去掉 data:image/xxx;base64, 前缀）
+      const matches = base64.match(/^data:image\/(\w+);base64,(.+)$/);
+      if (!matches) {
+        return { success: false, error: '无效的 Base64 数据' };
+      }
+
+      const extension = matches[1]; // jpg, png, etc.
+      const imageData = matches[2];
+      const buffer = Buffer.from(imageData, 'base64');
+
+      // 生成文件名：recordId_timestamp.ext
+      const timestamp = Date.now();
+      const fileName = `${recordId}_${timestamp}.${extension}`;
+      const filePath = path.join(screenshotsDir, fileName);
+
+      // 保存文件
+      fs.writeFileSync(filePath, buffer);
+
+      console.log(`截图已保存: ${fileName}`);
+
+      return {
+        success: true,
+        path: `screenshots/${fileName}`,
+        fullPath: filePath
+      };
+    } catch (e) {
+      console.error('保存截图失败:', e.message);
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * 读取已保存的截图
+   * @param {string} relativePath - 相对路径（如 screenshots/xxx.jpg）
+   */
+  getScreenshot(relativePath) {
+    try {
+      const fullPath = path.join(__dirname, '..', 'data', relativePath);
+      
+      if (!fs.existsSync(fullPath)) {
+        return { success: false, error: '截图文件不存在' };
+      }
+
+      const buffer = fs.readFileSync(fullPath);
+      const ext = path.extname(fullPath).substring(1);
+      const mimeType = ext === 'jpg' ? 'image/jpeg' : `image/${ext}`;
+      const base64 = `data:${mimeType};base64,${buffer.toString('base64')}`;
+
+      return {
+        success: true,
+        base64,
+        mimeType
+      };
+    } catch (e) {
+      console.error('读取截图失败:', e.message);
       return { success: false, error: e.message };
     }
   }

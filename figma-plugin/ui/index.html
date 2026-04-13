@@ -173,6 +173,7 @@
     .figma-link-item:hover .figma-link-actions { opacity: 1; }
     .figma-link-actions .icon-btn-mini { width: 24px; height: 24px; border: none; background: transparent; color: var(--text-secondary); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
     .figma-link-actions .icon-btn-mini:hover { background: rgba(183, 63, 108, 0.15); color: var(--accent); }
+    .figma-link-actions .icon-btn-mini.has-remark { color: var(--accent); background: rgba(183, 63, 108, 0.1); }
     .figma-link-actions .icon-btn-mini.delete:hover { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
     .figma-link-actions .icon-btn-mini svg { width: 14px; height: 14px; }
     
@@ -230,12 +231,12 @@
     .record-list-container { flex: 1; overflow-y: auto; max-height: 500px; }
     .record-item-card { background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 8px; position: relative; }
     .record-item-card:hover { border-color: var(--accent); }
-    .record-date { font-size: 10px; color: var(--text-secondary); margin-bottom: 8px; display: flex; align-items: center; gap: 4px; }
+    .record-date { font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; display: flex; align-items: center; gap: 4px; }
     .record-date::before { content: '📅'; }
     .record-links { display: flex; flex-direction: column; gap: 6px; }
-    .record-link { display: flex; align-items: center; gap: 6px; font-size: 11px; }
-    .record-link a { color: var(--accent); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; }
-    .record-link a:hover { text-decoration: underline; }
+    .record-link { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+    .record-link a { color: var(--text-primary); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 280px; font-size: 12px; }
+    .record-link a:hover { text-decoration: underline; color: var(--accent); }
     .record-link .link-icon { flex-shrink: 0; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
     .record-delete-btn { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border: none; background: transparent; color: var(--text-secondary); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: all 0.15s; }
     .record-item-card:hover .record-delete-btn { opacity: 0.6; }
@@ -404,7 +405,7 @@
   <!-- 页签切换 -->
   <div class="tab-container">
     <button class="tab-btn active" data-tab="main" id="tabMain">多方关联</button>
-    <button class="tab-btn" data-tab="records" id="tabRecords">需求记录</button>
+    <button class="tab-btn" data-tab="records" id="tabRecords">提审日报</button>
   </div>
 
   <!-- 页签内容：多方关联（主功能） -->
@@ -492,6 +493,7 @@
     <div class="add-box">
       <input type="text" id="figmaUrlInput" placeholder="从浏览器地址栏粘贴 Figma 链接">
       <button class="btn btn-small btn-primary" id="setFigmaUrlBtn">添加</button>
+      <button class="btn btn-small btn-secondary" id="gotoFigmaBtn" disabled title="在浏览器中打开选中的 Figma 链接">前往</button>
     </div>
     <!-- Figma 链接历史记录列表 -->
     <div class="figma-link-list" id="figmaLinkList">
@@ -525,7 +527,7 @@
       <div class="section-title-main" style="border-bottom:none; margin-bottom:12px;">
         <div class="title-left">
           <span class="title-icon">📝</span>
-          <span class="title-text">需求记录</span>
+          <span class="title-text">提审日报</span>
           <span class="issue-count-badge" id="recordCount">0</span>
         </div>
         <div class="title-actions">
@@ -571,7 +573,8 @@
       fileName: '', 
       baseFileUrl: '',
       figmaLinks: [],        // Figma 链接历史
-      selectedFigmaLink: null // 当前选中的 Figma 链接
+      selectedFigmaLink: null, // 当前选中的 Figma 链接
+      records: []            // 需求记录列表
     };
 
     // 从服务器恢复保存的数据
@@ -734,6 +737,7 @@
       
       // SVG 图标定义
       var copyIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+      var remarkIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>';
       var deleteIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
       
       var html = '';
@@ -741,8 +745,9 @@
         var link = state.figmaLinks[i];
         var selected = state.selectedFigmaLink && state.selectedFigmaLink.url === link.url ? 'selected' : '';
         
-        // 显示文件名 + nodeId
-        var displayTitle = link.fileName || '未命名文件';
+        // 显示文件名（带备注）
+        var baseName = link.fileName || '未命名文件';
+        var displayTitle = link.remark ? baseName + '（' + link.remark + '）' : baseName;
         var displaySub = link.nodeId ? 'node-id: ' + link.nodeId : link.fileKey.substring(0, 12) + '...';
         
         html += '<div class="figma-link-item ' + selected + '" data-index="' + i + '">';
@@ -752,6 +757,9 @@
         html += '<div class="figma-link-page" title="' + displaySub + '">' + displaySub + '</div>';
         html += '</div>';
         html += '<div class="figma-link-actions">';
+        var remarkClass = link.remark ? 'icon-btn-mini remark-btn has-remark' : 'icon-btn-mini remark-btn';
+        var remarkTitle = link.remark ? '编辑备注: ' + link.remark : '添加备注';
+        html += '<button class="' + remarkClass + '" title="' + remarkTitle + '" data-index="' + i + '">' + remarkIcon + '</button>';
         html += '<button class="icon-btn-mini copy-link-btn" title="复制链接" data-url="' + link.url + '">' + copyIcon + '</button>';
         html += '<button class="icon-btn-mini delete delete-link-btn" title="删除" data-index="' + i + '">' + deleteIcon + '</button>';
         html += '</div>';
@@ -783,6 +791,18 @@
           var url = this.getAttribute('data-url');
           copyToClipboard(url);
           showToast('✅ 链接已复制', 'success');
+        };
+      });
+      
+      // 备注按钮
+      var remarkBtns = document.querySelectorAll('.remark-btn');
+      remarkBtns.forEach(function(btn) {
+        btn.onclick = function(e) {
+          e.stopPropagation();
+          var index = parseInt(this.getAttribute('data-index'));
+          var link = state.figmaLinks[index];
+          
+          showRemarkDialog(link, index);
         };
       });
       
@@ -1434,8 +1454,10 @@
       
       // 复制工单号按钮：需要选中工单
       document.getElementById('copyIssueIdBtn').disabled = !hasIssue;
-      // 前往按钮：需要选中工单
+      // 前往工单按钮：需要选中工单
       document.getElementById('gotoIssueBtn').disabled = !hasIssue;
+      // 前往 Figma 按钮：需要选中 Figma 链接
+      document.getElementById('gotoFigmaBtn').disabled = !state.selectedFigmaLink;
       // 删除按钮：需要选中工单
       document.getElementById('deleteBtn').disabled = !hasIssue;
       // 关联按钮：需要选中工单 + 选中真实节点（非手动输入）
@@ -1482,7 +1504,9 @@
       
       if (state.selectedFigmaLink) {
         figmaUrl = state.selectedFigmaLink.url || '';
-        figmaTitle = state.selectedFigmaLink.docName || state.fileName || '';
+        var baseName = state.selectedFigmaLink.fileName || state.fileName || '';
+        // 如果有备注，格式化为 XXX（NNN）
+        figmaTitle = state.selectedFigmaLink.remark ? baseName + '（' + state.selectedFigmaLink.remark + '）' : baseName;
       } else if (state.selection && state.selection.figmaUrl) {
         figmaUrl = state.selection.figmaUrl;
         figmaTitle = state.selection.name || state.fileName || '';
@@ -1507,6 +1531,10 @@
       .then(function(d) {
         if (d.success) {
           console.log('需求记录已保存:', d.record);
+          
+          // 自动在后台生成截图
+          autoGenerateScreenshot(figmaUrl, d.record.id);
+          
           // 如果当前在记录页签，刷新列表
           if (document.getElementById('tabContentRecords').classList.contains('active')) {
             loadRecords();
@@ -1515,6 +1543,43 @@
       })
       .catch(function(e) {
         console.error('保存记录失败:', e);
+      });
+    }
+    
+    // 自动生成截图（后台静默执行）
+    function autoGenerateScreenshot(figmaUrl, recordId) {
+      // 检查 Figma Token 是否已配置
+      if (!figmaTokenConfigured) {
+        console.log('Figma Token 未配置，跳过自动截图');
+        return;
+      }
+      
+      console.log('后台生成截图中...', recordId);
+      
+      fetch(API + '/api/figma/screenshot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          figmaUrl: figmaUrl, 
+          scale: 1, 
+          save: true, 
+          recordId: recordId 
+        })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.success) {
+          console.log('✅ 截图生成完成:', recordId);
+          // 如果当前在记录页签，刷新列表以显示【查看截图】按钮
+          if (document.getElementById('tabContentRecords').classList.contains('active')) {
+            loadRecords();
+          }
+        } else {
+          console.log('截图生成失败:', d.error);
+        }
+      })
+      .catch(function(e) {
+        console.log('截图生成失败:', e.message);
       });
     }
 
@@ -1542,6 +1607,7 @@
         .then(function(r) { return r.json(); })
         .then(function(d) {
           if (d.success) {
+            state.records = d.records; // 保存到 state
             renderRecords(d.records);
           }
         })
@@ -1588,10 +1654,20 @@
         
         // 操作按钮
         html += '<div class="record-actions">';
-        html += '<button class="record-action-btn screenshot-btn" data-url="' + encodeURIComponent(record.figmaUrl) + '" title="获取设计截图并复制到剪贴板">';
-        html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>';
-        html += '<span>设计截图</span>';
-        html += '</button>';
+        
+        // 如果有截图，显示【查看截图】，否则显示【生成截图】
+        if (record.screenshotBase64) {
+          html += '<button class="record-action-btn view-screenshot-btn" data-id="' + record.id + '" title="查看已保存的截图">';
+          html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
+          html += '<span>查看截图</span>';
+          html += '</button>';
+        } else {
+          html += '<button class="record-action-btn screenshot-btn" data-url="' + encodeURIComponent(record.figmaUrl) + '" data-id="' + record.id + '" title="生成设计截图">';
+          html += '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>';
+          html += '<span>生成截图</span>';
+          html += '</button>';
+        }
+        
         html += '</div>';
         
         html += '</div>';
@@ -1632,7 +1708,17 @@
         btn.onclick = function(e) {
           e.stopPropagation();
           var figmaUrl = decodeURIComponent(this.getAttribute('data-url'));
-          captureScreenshot(figmaUrl, this);
+          var recordId = this.getAttribute('data-id');
+          captureScreenshot(figmaUrl, recordId, this);
+        };
+      });
+      
+      // 绑定查看截图按钮
+      document.querySelectorAll('.view-screenshot-btn').forEach(function(btn) {
+        btn.onclick = function(e) {
+          e.stopPropagation();
+          var recordId = parseInt(this.getAttribute('data-id'));
+          viewSavedScreenshot(recordId);
         };
       });
     }
@@ -1651,7 +1737,7 @@
         });
     }
     
-    function captureScreenshot(figmaUrl, btn) {
+    function captureScreenshot(figmaUrl, recordId, btn) {
       if (!figmaTokenConfigured) {
         showFigmaTokenDialog();
         return;
@@ -1659,14 +1745,14 @@
       
       // 显示加载状态
       var originalHtml = btn.innerHTML;
-      btn.innerHTML = '<span>截图中...</span>';
+      btn.innerHTML = '<span>生成中...</span>';
       btn.classList.add('loading');
       btn.disabled = true;
       
       fetch(API + '/api/figma/screenshot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ figmaUrl: figmaUrl, scale: 1 })
+        body: JSON.stringify({ figmaUrl: figmaUrl, scale: 1, save: true, recordId: recordId })
       })
       .then(function(r) { return r.json(); })
       .then(function(d) {
@@ -1674,12 +1760,12 @@
           // 将 Base64 图片复制到剪贴板
           copyImageToClipboard(d.base64, function(success) {
             if (success) {
-              showToast('✅ 截图已复制到剪贴板', 'success');
+              showToast('✅ 截图已保存并复制到剪贴板', 'success');
             } else {
-              // 如果无法复制图片，提供下载链接
-              showToast('⚠️ 无法复制图片，请右键另存', 'error');
-              window.open(d.imageUrl, '_blank');
+              showToast('✅ 截图已保存', 'success');
             }
+            // 重新加载记录列表，更新按钮状态
+            loadRecords();
           });
         } else {
           if (d.needToken) {
@@ -1699,33 +1785,244 @@
       });
     }
     
-    // 复制图片到剪贴板
+    // 查看已保存的截图
+    function viewSavedScreenshot(recordId) {
+      // 从记录数据中查找截图
+      var record = state.records.find(function(r) { return r.id === recordId; });
+      if (!record || !record.screenshotBase64) {
+        showToast('截图数据不存在', 'error');
+        return;
+      }
+      
+      // 直接使用保存的 Base64 数据
+      copyImageToClipboard(record.screenshotBase64, function(success) {
+        if (success) {
+          showToast('✅ 截图已复制到剪贴板', 'success');
+        }
+      });
+    }
+    
+    // 显示备注对话框
+    function showRemarkDialog(link, index) {
+      var dialog = document.createElement('div');
+      dialog.id = 'remarkDialog';
+      dialog.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:10000;';
+      
+      var content = '<div style="background:var(--bg-secondary); border-radius:12px; padding:20px; width:90%; max-width:400px;">';
+      content += '<h3 style="margin:0 0 12px; color:var(--text-primary); font-size:14px;">✏️ 编辑备注</h3>';
+      content += '<input type="text" id="remarkInput" value="' + (link.remark || '').replace(/"/g, '&quot;') + '" placeholder="请输入备注（留空则删除）" style="width:100%; padding:8px 12px; background:var(--bg-tertiary); border:1px solid var(--border); border-radius:6px; color:var(--text-primary); font-size:12px; box-sizing:border-box; margin-bottom:16px;">';
+      content += '<div style="display:flex; gap:8px; justify-content:flex-end;">';
+      content += '<button id="remarkCancelBtn" style="padding:8px 16px; background:var(--bg-tertiary); color:var(--text-secondary); border:none; border-radius:6px; cursor:pointer; font-size:11px;">取消</button>';
+      content += '<button id="remarkSaveBtn" style="padding:8px 16px; background:var(--accent); color:white; border:none; border-radius:6px; cursor:pointer; font-size:11px;">保存</button>';
+      content += '</div>';
+      content += '</div>';
+      
+      dialog.innerHTML = content;
+      document.body.appendChild(dialog);
+      
+      var input = document.getElementById('remarkInput');
+      input.focus();
+      input.select();
+      
+      // 保存按钮
+      document.getElementById('remarkSaveBtn').onclick = function() {
+        var newRemark = input.value.trim();
+        
+        if (newRemark === '') {
+          delete link.remark;
+          showToast('已删除备注', 'success');
+        } else {
+          link.remark = newRemark;
+          showToast('✅ 备注已保存', 'success');
+        }
+        
+        // 如果修改的是当前选中的链接，更新选中状态
+        if (state.selectedFigmaLink && state.selectedFigmaLink.url === link.url) {
+          state.selectedFigmaLink = link;
+        }
+        
+        saveState();
+        renderFigmaLinks();
+        dialog.remove();
+      };
+      
+      // 取消按钮
+      document.getElementById('remarkCancelBtn').onclick = function() {
+        dialog.remove();
+      };
+      
+      // 回车保存
+      input.onkeydown = function(e) {
+        if (e.key === 'Enter') {
+          document.getElementById('remarkSaveBtn').click();
+        } else if (e.key === 'Escape') {
+          dialog.remove();
+        }
+      };
+      
+      // 点击背景关闭
+      dialog.onclick = function(e) {
+        if (e.target === dialog) {
+          dialog.remove();
+        }
+      };
+    }
+    
+    // 复制图片到剪贴板（通过 Canvas 方式，兼容 Figma 插件环境）
     function copyImageToClipboard(base64, callback) {
       try {
-        // 将 base64 转为 blob
-        var parts = base64.split(';base64,');
-        var mimeType = parts[0].split(':')[1];
-        var byteString = atob(parts[1]);
-        var ab = new ArrayBuffer(byteString.length);
-        var ia = new Uint8Array(ab);
-        for (var i = 0; i < byteString.length; i++) {
-          ia[i] = byteString.charCodeAt(i);
-        }
-        var blob = new Blob([ab], { type: mimeType });
-        
-        // 使用 Clipboard API 复制图片
-        navigator.clipboard.write([
-          new ClipboardItem({ [mimeType]: blob })
-        ]).then(function() {
-          callback(true);
-        }).catch(function(e) {
-          console.log('Clipboard API 失败:', e);
+        var img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = function() {
+          // 创建 Canvas
+          var canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          
+          // 尝试使用 canvas.toBlob + Clipboard API
+          canvas.toBlob(function(blob) {
+            if (!blob) {
+              console.log('Canvas toBlob 失败');
+              callback(false);
+              return;
+            }
+            
+            // 尝试 Clipboard API
+            if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
+              navigator.clipboard.write([
+                new ClipboardItem({ 'image/png': blob })
+              ]).then(function() {
+                callback(true);
+              }).catch(function(e) {
+                console.log('Clipboard API 失败:', e);
+                // 降级方案：发送到 Figma 主进程处理
+                copyViaFigmaMessage(base64, callback);
+              });
+            } else {
+              // 不支持 Clipboard API，使用降级方案
+              copyViaFigmaMessage(base64, callback);
+            }
+          }, 'image/png');
+        };
+        img.onerror = function() {
+          console.log('图片加载失败');
           callback(false);
-        });
+        };
+        img.src = base64;
       } catch (e) {
         console.log('复制图片失败:', e);
         callback(false);
       }
+    }
+    
+    // 降级方案：通过 Figma 消息机制处理图片
+    function copyViaFigmaMessage(base64, callback) {
+      // 尝试通过选择隐藏的文本来触发复制（提示用户手动粘贴）
+      // 创建临时的可视化面板让用户可以右键复制
+      var dialog = document.createElement('div');
+      dialog.id = 'imageCopyDialog';
+      dialog.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.85); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; padding:20px;';
+      
+      var content = '<div style="background:var(--bg-secondary); border-radius:12px; padding:16px; max-width:90%; max-height:80%; overflow:auto; text-align:center;">';
+      content += '<p style="color:var(--text-primary); margin:0 0 8px; font-size:12px;">📸 截图预览</p>';
+      content += '<p style="color:var(--text-secondary); margin:0 0 12px; font-size:10px;">点击复制按钮将图片复制到剪贴板</p>';
+      content += '<div id="imgContainer" contenteditable="true" style="outline:none; display:inline-block;"><img src="' + base64 + '" style="max-width:100%; max-height:350px; border-radius:8px;" id="screenshotImg"></div>';
+      content += '<div style="margin-top:12px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">';
+      content += '<button id="copyImgBtn" style="padding:8px 16px; background:var(--accent); color:white; border:none; border-radius:6px; cursor:pointer; font-size:11px;">📋 复制图片</button>';
+      content += '<button id="downloadImgBtn" style="padding:8px 16px; background:var(--bg-tertiary); color:var(--text-primary); border:none; border-radius:6px; cursor:pointer; font-size:11px;">💾 下载图片</button>';
+      content += '<button id="closeImgDialogBtn" style="padding:8px 16px; background:var(--bg-tertiary); color:var(--text-secondary); border:none; border-radius:6px; cursor:pointer; font-size:11px;">关闭</button>';
+      content += '</div>';
+      content += '</div>';
+      
+      dialog.innerHTML = content;
+      document.body.appendChild(dialog);
+      
+      // 复制图片按钮 - 使用多种方式尝试
+      document.getElementById('copyImgBtn').onclick = function() {
+        var img = document.getElementById('screenshotImg');
+        var container = document.getElementById('imgContainer');
+        var copied = false;
+        
+        // 方法1: 选中 contenteditable 内容并执行 copy
+        try {
+          var range = document.createRange();
+          range.selectNode(container);
+          var selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+          copied = document.execCommand('copy');
+          selection.removeAllRanges();
+          if (copied) {
+            showToast('✅ 图片已复制到剪贴板', 'success');
+            dialog.remove();
+            return;
+          }
+        } catch (e) {
+          console.log('execCommand 方式失败:', e);
+        }
+        
+        // 方法2: Canvas + Clipboard API
+        try {
+          var canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          
+          canvas.toBlob(function(blob) {
+            if (blob && navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
+              navigator.clipboard.write([
+                new ClipboardItem({ 'image/png': blob })
+              ]).then(function() {
+                showToast('✅ 图片已复制到剪贴板', 'success');
+                dialog.remove();
+              }).catch(function(e) {
+                console.log('Clipboard API 失败:', e);
+                fallbackCopy();
+              });
+            } else {
+              fallbackCopy();
+            }
+          }, 'image/png');
+        } catch (e) {
+          console.log('Canvas 方式失败:', e);
+          fallbackCopy();
+        }
+        
+        function fallbackCopy() {
+          // 降级：在浏览器打开
+          var html = '<!DOCTYPE html><html><head><title>Figma 截图</title><style>body{margin:0;padding:20px;background:#1a1a2e;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;}img{max-width:95%;max-height:85vh;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.5);}p{color:#d6d6d8;margin:0 0 16px;font-size:14px;}.tip{color:#9090a0;font-size:12px;margin-top:16px;}</style></head><body><p>📋 右键点击图片 → 复制图片</p><img src="' + base64 + '"><p class="tip">复制后可直接粘贴到日报系统</p></body></html>';
+          var htmlBlob = new Blob([html], { type: 'text/html' });
+          var url = URL.createObjectURL(htmlBlob);
+          window.open(url, '_blank');
+          showToast('⚠️ 已在浏览器打开，请右键复制', 'success');
+          dialog.remove();
+        }
+      };
+      
+      // 下载按钮
+      document.getElementById('downloadImgBtn').onclick = function() {
+        var link = document.createElement('a');
+        link.download = 'figma-screenshot-' + Date.now() + '.png';
+        link.href = base64;
+        link.click();
+        showToast('✅ 图片已下载，可拖拽到日报', 'success');
+      };
+      
+      // 关闭按钮
+      document.getElementById('closeImgDialogBtn').onclick = function() {
+        dialog.remove();
+      };
+      
+      // 点击背景关闭
+      dialog.onclick = function(e) {
+        if (e.target === dialog) dialog.remove();
+      };
+      
+      // 返回 false 表示自动复制失败，但已提供手动方式
+      callback(false);
     }
     
     // Figma Token 配置对话框
@@ -1734,10 +2031,11 @@
       html += '<h3 style="margin:0 0 12px; color:var(--text-primary);">配置 Figma Token</h3>';
       html += '<p style="font-size:11px; color:var(--text-secondary); margin-bottom:12px;">截图功能需要 Figma Personal Access Token</p>';
       html += '<ol style="font-size:11px; color:var(--text-secondary); margin:0 0 12px; padding-left:16px; line-height:1.8;">';
-      html += '<li>打开 <a href="https://www.figma.com/settings" target="_blank" style="color:var(--accent);">Figma 设置</a></li>';
-      html += '<li>找到 <strong>Personal access tokens</strong></li>';
-      html += '<li>点击 <strong>Generate new token</strong></li>';
-      html += '<li>复制生成的 Token，粘贴到下方</li>';
+      html += '<li>打开 Figma 主界面左上角的头像，找到 <strong>Settings</strong> 设置入口</li>';
+      html += '<li>在第四个页签 <strong>Security</strong> 下的 <strong>Personal access tokens</strong></li>';
+      html += '<li>点击文本入口 <strong>Generate new token</strong></li>';
+      html += '<li>输入任意 Token 命名，日期 90 天，并勾选所有的 Scopes 栏后确认生成</li>';
+      html += '<li>复制生成的 Token 即可</li>';
       html += '</ol>';
       html += '<input type="text" id="figmaTokenInput" placeholder="粘贴 Figma Token" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px; background:var(--bg-tertiary); color:var(--text-primary); font-size:12px; box-sizing:border-box;">';
       html += '<div style="display:flex; gap:8px; margin-top:12px;">';
@@ -1888,6 +2186,17 @@
       
       // 在新标签页打开工单链接
       window.open(issueUrl, '_blank');
+    };
+
+    // 前往 Figma 设计稿页面
+    document.getElementById('gotoFigmaBtn').onclick = function() {
+      if (!state.selectedFigmaLink) return;
+      
+      var figmaUrl = state.selectedFigmaLink.url;
+      
+      // 在新标签页打开 Figma 链接
+      window.open(figmaUrl, '_blank');
+      showToast('✅ 已在浏览器打开 Figma 设计稿', 'success');
     };
 
     // 删除工单

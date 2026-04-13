@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const figmaService = require('../services/figmaService');
+const recordService = require('../services/recordService');
 
 /**
  * GET /api/figma/token
@@ -36,11 +37,11 @@ router.post('/token', (req, res) => {
 /**
  * POST /api/figma/screenshot
  * 获取 Figma 截图
- * Body: { figmaUrl: string, scale?: number }
+ * Body: { figmaUrl: string, scale?: number, save?: boolean, recordId?: string }
  */
 router.post('/screenshot', async (req, res) => {
   try {
-    const { figmaUrl, scale = 1 } = req.body;
+    const { figmaUrl, scale = 1, save = false, recordId = null } = req.body;
     
     if (!figmaUrl) {
       return res.status(400).json({ success: false, error: '缺少 figmaUrl 参数' });
@@ -53,7 +54,7 @@ router.post('/screenshot', async (req, res) => {
       return res.status(400).json({ success: false, error: '无法解析 Figma URL' });
     }
 
-    console.log(`截图请求: fileKey=${fileKey}, nodeId=${nodeId}, scale=${scale}`);
+    console.log(`截图请求: fileKey=${fileKey}, nodeId=${nodeId}, scale=${scale}, save=${save}`);
 
     // 如果没有节点 ID，先获取文件信息
     let targetNodeId = nodeId;
@@ -81,6 +82,11 @@ router.post('/screenshot', async (req, res) => {
     
     if (!downloadResult.success) {
       return res.json(downloadResult);
+    }
+
+    // 如果需要保存到记录中
+    if (save && recordId) {
+      recordService.updateRecordScreenshot(parseInt(recordId), downloadResult.base64);
     }
 
     res.json({
@@ -120,6 +126,25 @@ router.post('/file-info', async (req, res) => {
 
   } catch (error) {
     console.error('获取文件信息失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/figma/screenshot/:path
+ * 读取已保存的截图
+ */
+router.get('/screenshot/:path(*)', (req, res) => {
+  try {
+    const result = figmaService.getScreenshot(req.params.path);
+    
+    if (!result.success) {
+      return res.status(404).json(result);
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('读取截图失败:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
