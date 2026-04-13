@@ -524,6 +524,12 @@
               <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
             </svg>
           </button>
+          <button class="icon-btn" id="clearRecordsBtn" title="清空所有记录" style="color:var(--text-secondary);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
         </div>
       </div>
       <p style="font-size:10px; color:var(--text-secondary); margin:-8px 0 12px; padding:0 4px;">点击「复制审核内容」时自动记录，最多保留50条</p>
@@ -1237,13 +1243,13 @@
       var filterRadio = document.querySelector('input[name="statusFilter"]:checked');
       var filter = filterRadio ? filterRadio.value : 'default';
       
-      // 需要排除的状态
-      var excludeStatuses = ['已关闭', '关闭', 'Closed', '跟进验收联调'];
+      // 需要排除的状态（默认筛选时不显示这些状态）
+      var excludeStatuses = ['已关闭', '关闭', 'Closed', '跟进验收联调', '开发中'];
       
       if (filter === 'all') {
         state.filteredIssues = state.issues;
       } else if (filter === 'default') {
-        // 默认 = 排除"已关闭"和"跟进验收联调"
+        // 默认 = 排除"已关闭"、"跟进验收联调"、"开发中"
         state.filteredIssues = state.issues.filter(function(issue) {
           var status = issue.status || '';
           return excludeStatuses.indexOf(status) === -1;
@@ -1606,6 +1612,31 @@
       btn.classList.add('refreshing');
       loadRecords();
       setTimeout(function() { btn.classList.remove('refreshing'); }, 500);
+    };
+    
+    // 清空所有记录按钮
+    document.getElementById('clearRecordsBtn').onclick = function() {
+      var recordCount = document.getElementById('recordCount').textContent;
+      if (recordCount === '0') {
+        showToast('暂无记录可清空', 'error');
+        return;
+      }
+      
+      if (confirm('确定要清空所有记录吗？\n\n此操作不可撤销！')) {
+        fetch(API + '/api/redmine/records', { method: 'DELETE' })
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d.success) {
+              showToast('✅ 已清空所有记录', 'success');
+              loadRecords();
+            } else {
+              showToast('清空失败: ' + (d.error || '未知错误'), 'error');
+            }
+          })
+          .catch(function(e) {
+            showToast('清空失败: ' + e.message, 'error');
+          });
+      }
     };
 
     // 刷新工单列表（从易协作重新同步）

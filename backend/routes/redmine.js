@@ -385,6 +385,20 @@ router.post('/records', (req, res) => {
 });
 
 /**
+ * DELETE /api/redmine/records
+ * 清空所有记录（必须放在 /records/:id 之前）
+ */
+router.delete('/records', (req, res) => {
+  try {
+    const result = recordService.clearAllRecords();
+    res.json(result);
+  } catch (error) {
+    console.error('清空记录失败:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
  * DELETE /api/redmine/records/:id
  * 删除指定记录
  */

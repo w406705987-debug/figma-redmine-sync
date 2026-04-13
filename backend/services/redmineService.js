@@ -378,6 +378,14 @@ class RedmineService {
       // 解析工单数据
       const issues = response.data.data?.list || response.data.data?.issues || [];
       console.log(`从易协作获取到 ${issues.length} 个工单`);
+      
+      // 输出各状态的统计
+      const statusCount = {};
+      issues.forEach(issue => {
+        const status = typeof issue.status === 'object' ? issue.status.value : (issue.status || '未知');
+        statusCount[status] = (statusCount[status] || 0) + 1;
+      });
+      console.log('工单状态分布:', statusCount);
 
       // 转换格式并保存到缓存
       const formattedIssues = this.formatIssues(issues);
@@ -425,21 +433,46 @@ class RedmineService {
    */
   async syncWithCookie(cookie) {
     try {
+      console.log('========================================');
       console.log('开始使用 Cookie 从易协作同步工单...');
       console.log('查询范围: 所有项目 | 指派人: 当前用户 | 状态: 未关闭');
+      console.log('========================================');
       
       const baseUrl = `https://${this.host}/api/v6/issues`;
       
-      // 不限制项目，拉取所有指派给当前用户的未关闭工单
+      // 拉取工单：指派给我 OR UI字段是我
+      // 使用 combination 模式实现 OR 条件
       const requestBody = {
         set_filter: 1,
         mode: 'preview',
-        per_page: 100,
-        filters: {
-          assigned_to_id: { operator: '=', values: ['me'] },
-          status_id: { operator: 'o', values: [] }  // o = open (打开/未关闭)
-        }
+        per_page: 200,
+        filter_mode: 'combination',
+        combination_filters: {
+          join_type: 'or',  // 使用 OR 连接
+          conditions: [
+            {
+              filter_type: 'filter',
+              join_type: 'or',
+              filter_groups: [
+                { assigned_to_id: { operator: '=', values: ['me'] } }  // 指派给我
+              ]
+            },
+            {
+              filter_type: 'filter',
+              join_type: 'or', 
+              filter_groups: [
+                { cf_54: { operator: '=', values: ['me'] } }  // UI字段（ID: 54，名称: UI，类型: 用户）
+              ]
+            }
+          ],
+          global_filters: {
+            status_id: { operator: 'o', values: [] }  // 只查未关闭的
+          }
+        },
+        c: ['tracker', 'status', 'priority', 'subject', 'assigned_to', 'due_date', 'done_ratio']
       };
+      
+      console.log('请求参数:', JSON.stringify(requestBody, null, 2));
 
       const response = await axios.post(baseUrl, requestBody, {
         headers: {
@@ -462,6 +495,16 @@ class RedmineService {
       }
 
       const issues = response.data.data?.list || [];
+      console.log('获取到工单数量:', issues.length);
+      
+      // 输出各状态的统计
+      const statusCount = {};
+      issues.forEach(issue => {
+        const status = typeof issue.status === 'object' ? issue.status.value : (issue.status || '未知');
+        statusCount[status] = (statusCount[status] || 0) + 1;
+      });
+      console.log('工单状态分布:', statusCount);
+      
       const formattedIssues = this.formatIssues(issues);
       this.updateCache(formattedIssues);
 

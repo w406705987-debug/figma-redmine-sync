@@ -9,10 +9,29 @@ echo.
 set "SCRIPT_DIR=%~dp0"
 set "STARTUP_FOLDER=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
 
-:: 创建 VBS 启动脚本（静默启动，无黑窗口）
+:: 创建 VBS 启动脚本（静默启动，无黑窗口，带进程检测防止重复启动）
 echo 正在创建静默启动脚本...
 (
+echo ' Figma-易协作同步服务 静默启动脚本
+echo ' 会先检查是否已有服务运行，避免重复启动
+echo.
 echo Set WshShell = CreateObject^("WScript.Shell"^)
+echo Set objWMI = GetObject^("winmgmts:\\.\root\cimv2"^)
+echo.
+echo Set colProcesses = objWMI.ExecQuery^("SELECT * FROM Win32_Process WHERE Name = 'node.exe'"^)
+echo.
+echo nodeCount = 0
+echo For Each objProcess in colProcesses
+echo     cmdLine = objProcess.CommandLine
+echo     If InStr^(cmdLine, "server.js"^) ^> 0 Then
+echo         nodeCount = nodeCount + 1
+echo     End If
+echo Next
+echo.
+echo If nodeCount ^> 0 Then
+echo     WScript.Quit
+echo End If
+echo.
 echo WshShell.CurrentDirectory = "%SCRIPT_DIR%"
 echo WshShell.Run "cmd /c node server.js", 0, False
 ) > "%SCRIPT_DIR%start-silent.vbs"

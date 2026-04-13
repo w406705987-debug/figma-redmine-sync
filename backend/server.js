@@ -12,7 +12,6 @@ const config = require('./config');
 // 路由模块
 const redmineRoutes = require('./routes/redmine');
 const popoRoutes = require('./routes/popo');
-const recordsRoutes = require('./routes/records');
 
 // 设置文件路径
 const SETTINGS_FILE = path.join(__dirname, 'data', 'settings.json');
@@ -48,7 +47,6 @@ app.get('/health', (req, res) => {
 // 注册路由
 app.use('/api/redmine', redmineRoutes);
 app.use('/api/popo', popoRoutes);
-app.use('/api/records', recordsRoutes);
 
 // 设置存储（用于保存 Figma URL 等配置）
 app.get('/api/settings/figma-url', (req, res) => {
