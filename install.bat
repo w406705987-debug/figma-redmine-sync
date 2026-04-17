@@ -70,9 +70,25 @@ echo.
 set "SCRIPT_DIR=%~dp0backend\"
 set "STARTUP_FOLDER=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
 
-:: 创建 VBS 启动脚本
+:: 创建 VBS 启动脚本（带进程检测，避免重复启动）
 (
+echo ' Figma-易协作同步服务 - 静默启动脚本
+echo ' 启动前检查是否已有进程在运行
+echo.
 echo Set WshShell = CreateObject^("WScript.Shell"^)
+echo Set objWMIService = GetObject^("winmgmts:\\.\root\cimv2"^)
+echo.
+echo ' 检查是否已有 node server.js 在运行
+echo Set colProcesses = objWMIService.ExecQuery^("SELECT * FROM Win32_Process WHERE Name = 'node.exe'"^)
+echo.
+echo For Each objProcess in colProcesses
+echo     If InStr^(objProcess.CommandLine, "server.js"^) ^> 0 Then
+echo         ' 已有服务在运行，直接退出
+echo         WScript.Quit
+echo     End If
+echo Next
+echo.
+echo ' 没有运行，启动服务
 echo WshShell.CurrentDirectory = "%SCRIPT_DIR%"
 echo WshShell.Run "cmd /c node server.js", 0, False
 ) > "%SCRIPT_DIR%start-silent.vbs"
